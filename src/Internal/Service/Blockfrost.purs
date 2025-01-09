@@ -1196,7 +1196,7 @@ instance DecodeAeson BlockfrostUtxosOfTransaction where
       -> Either JsonDecodeError (Maybe BlockfrostUnspentOutput)
     decodeUtxoEntry txHash utxoAeson = do
       (consumedByTx :: Maybe String) <- aesonObject
-        (flip getFieldOptional "consumed_by_tx")
+        (flip getFieldOptional' "consumed_by_tx")
         utxoAeson
       case consumedByTx of
         Nothing ->
