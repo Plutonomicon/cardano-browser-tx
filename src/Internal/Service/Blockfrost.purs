@@ -1186,15 +1186,24 @@ instance Show BlockfrostUtxosOfTransaction where
 instance DecodeAeson BlockfrostUtxosOfTransaction where
   decodeAeson = aesonObject \obj -> do
     txHash <- getField obj "hash"
-    getField obj "outputs"
-      >>= aesonArray (map wrap <<< traverse (decodeUtxoEntry txHash))
+    outputs <- getField obj "outputs"
+    aesonArray (map (wrap <<< catMaybes) <<< traverse (decodeUtxoEntry txHash))
+      outputs
     where
     decodeUtxoEntry
       :: TransactionHash
       -> Aeson
-      -> Either JsonDecodeError BlockfrostUnspentOutput
-    decodeUtxoEntry txHash utxoAeson =
-      Tuple <$> decodeTxOref txHash utxoAeson <*> decodeAeson utxoAeson
+      -> Either JsonDecodeError (Maybe BlockfrostUnspentOutput)
+    decodeUtxoEntry txHash utxoAeson = do
+      (consumedByTx :: Maybe String) <- aesonObject
+        (flip getFieldOptional "consumed_by_tx")
+        utxoAeson
+      case consumedByTx of
+        Nothing ->
+          Just <$>
+            (Tuple <$> decodeTxOref txHash utxoAeson <*> decodeAeson utxoAeson)
+        Just _ ->
+          pure Nothing
 
     decodeTxOref
       :: TransactionHash -> Aeson -> Either JsonDecodeError TransactionInput

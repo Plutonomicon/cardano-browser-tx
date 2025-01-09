@@ -16,7 +16,7 @@
       type = "github";
       owner = "Plutonomicon";
       repo = "cardano-transaction-lib";
-      rev = "c55856ce2bd191e522329718bd5324107e4f97f4";
+      rev = "f70a82f551d1aa4065312695784536d9fecbc947";
     };
     # To use the same version of `nixpkgs` as we do
     nixpkgs.follows = "ctl/nixpkgs";
