@@ -213,8 +213,8 @@ signTx conn tx = do
   mkInvalidHexError hexString = error $ "Unable to decode WitnessSet bytes: " <>
     hexString
 
--- | Supports : `BaseAddress`, `EnterpriseAddress`,
--- | `PointerAddress` and `RewardAddress`
+-- | Supports : `BaseAddress`, `EnterpriseAddress`
+-- | and `RewardAddress`
 signData :: Api -> Address -> RawBytes -> Aff DataSignature
 signData conn address dat = do
   -- TODO: forbid byron addresses
