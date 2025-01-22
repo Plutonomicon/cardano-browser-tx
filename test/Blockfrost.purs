@@ -3,7 +3,7 @@ module Test.Ctl.Blockfrost (main, testPlan) where
 import Prelude
 
 import Cardano.AsCbor (decodeCbor)
-import Cardano.Serialization.Lib (fromBytes)
+import Cardano.Data.Lite (fromBytes)
 import Cardano.Types (ScriptHash)
 import Cardano.Types.BigNum as BigNum
 import Contract.Config (blockfrostPublicPreviewServerConfig)

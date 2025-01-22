@@ -7,7 +7,7 @@ module Ctl.Internal.Wallet.Cip30
 import Prelude
 
 import Cardano.AsCbor (decodeCbor, encodeCbor)
-import Cardano.Serialization.Lib (fromBytes, toBytes)
+import Cardano.Data.Lite (fromBytes, toBytes)
 import Cardano.Types.Address (Address)
 import Cardano.Types.BigNum as BigNum
 import Cardano.Types.CborBytes (CborBytes)

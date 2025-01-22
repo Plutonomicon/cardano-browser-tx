@@ -25,7 +25,7 @@ import Affjax (Error, Response, defaultRequest) as Affjax
 import Affjax.ResponseFormat (string) as Affjax.ResponseFormat
 import Affjax.StatusCode (StatusCode(StatusCode))
 import Cardano.AsCbor (decodeCbor, encodeCbor)
-import Cardano.Serialization.Lib (fromBytes, toBytes)
+import Cardano.Data.Lite (fromBytes, toBytes)
 import Cardano.Types
   ( Address
   , BigNum

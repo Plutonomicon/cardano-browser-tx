@@ -211,11 +211,23 @@ let
 
     "cardano-collateral-select" = pkgs.stdenv.mkDerivation {
         name = "cardano-collateral-select";
-        version = "v1.0.0";
+        version = "fed22134275a4668d9458cbebba566667c4cafe0";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-cardano-collateral-select";
-          rev = "193bf49be979b42aa1f0f9cb3d7582d6bc98e3b9";
-          sha256 = "1jbl6k779brbqzf7jf80is63b23k3mqzf2mzr222qswd3wg8s5b0";
+          rev = "fed22134275a4668d9458cbebba566667c4cafe0";
+          sha256 = "08d3m6drdv22qixfazjm7kl59x1ykfwkiybaaj62jz7blby7wvym";
+        };
+        phases = "installPhase";
+        installPhase = "ln -s $src $out";
+      };
+
+    "cardano-data-lite" = pkgs.stdenv.mkDerivation {
+        name = "cardano-data-lite";
+        version = "55c8d58ba5d60ebb3f19a30adbd37cf2cd269ade";
+        src = pkgs.fetchgit {
+          url = "https://github.com/mlabs-haskell/purescript-cardano-data-lite";
+          rev = "55c8d58ba5d60ebb3f19a30adbd37cf2cd269ade";
+          sha256 = "11nfkivqs2xjaha6skpbm804fg86lyfi8cnqjn9sx72l5wxm609y";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";
@@ -223,11 +235,11 @@ let
 
     "cardano-hd-wallet" = pkgs.stdenv.mkDerivation {
         name = "cardano-hd-wallet";
-        version = "cc1073ddf8bce72407ef6671e3decb59f422e304";
+        version = "1e3aacfb1ea083aed9f1af06a85e367326e03528";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-cardano-hd-wallet";
-          rev = "cc1073ddf8bce72407ef6671e3decb59f422e304";
-          sha256 = "0y51lp3x785yjjrr91rmpw1bhzjdfjb5fs27n1vlwihxjyfylxya";
+          rev = "1e3aacfb1ea083aed9f1af06a85e367326e03528";
+          sha256 = "0664yvqaqrllivcnbf2kx76b3mgbvg0591mqd6c23izlkddfidjy";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";
@@ -235,11 +247,11 @@ let
 
     "cardano-key-wallet" = pkgs.stdenv.mkDerivation {
         name = "cardano-key-wallet";
-        version = "v2.0.0";
+        version = "3d7dd4e1e3dfa04b2d5c81dd857da356c4372ea1";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-cardano-key-wallet";
-          rev = "99d9bb7c8b291ad0bc9709d493ff7e02d14a89c0";
-          sha256 = "11jw05s7vpgg6bdyi3zy4z1fcj53a8kaaja5717b7yjgflmhfn8s";
+          rev = "3d7dd4e1e3dfa04b2d5c81dd857da356c4372ea1";
+          sha256 = "007gs659gnrv2cvwmrmmg8pm9b3hyyfgbg186sp63gbsl87myx8w";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";
@@ -247,11 +259,11 @@ let
 
     "cardano-message-signing" = pkgs.stdenv.mkDerivation {
         name = "cardano-message-signing";
-        version = "v1.0.0";
+        version = "698a0ca76c395a96c84c5955a92a0962e51904cb";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-cardano-message-signing";
-          rev = "97f6f97a258ae3490df0be6b39fa6769677aa04f";
-          sha256 = "1ns7m9awn4w5amvf9ffldxk7acm73fg8clw4hja4nnl61mskqr5w";
+          rev = "698a0ca76c395a96c84c5955a92a0962e51904cb";
+          sha256 = "0sm24wygrrcwhpvg5114kvp7fpapzwlqb5slwqha52jfgbl5mw1m";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";
@@ -269,25 +281,13 @@ let
         installPhase = "ln -s $src $out";
       };
 
-    "cardano-serialization-lib" = pkgs.stdenv.mkDerivation {
-        name = "cardano-serialization-lib";
-        version = "v3.0.0";
-        src = pkgs.fetchgit {
-          url = "https://github.com/mlabs-haskell/purescript-cardano-serialization-lib";
-          rev = "5865fddad045566ca2192526a7de355c59629000";
-          sha256 = "18824bw5hczhm8wgg7n668fnx2bx0211ykj4dwnw2d7zxw1jm2z4";
-        };
-        phases = "installPhase";
-        installPhase = "ln -s $src $out";
-      };
-
     "cardano-transaction-builder" = pkgs.stdenv.mkDerivation {
         name = "cardano-transaction-builder";
-        version = "v2.0.0";
+        version = "4a064fdff00a864c114e2ff7b6655d1cca4adb20";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-cardano-transaction-builder";
-          rev = "2a31258a85e441b6747582ab35d7d86fc866c749";
-          sha256 = "1xz6k56kwghq9nl0iwrqs6m05wja0xfj34iicmlhwvdp7k4nc65w";
+          rev = "4a064fdff00a864c114e2ff7b6655d1cca4adb20";
+          sha256 = "0shd0zri9h0vzp0326x1fgbiv0i8rb5ds1xz9bqr6kkw4plmhaa9";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";
@@ -295,11 +295,11 @@ let
 
     "cardano-types" = pkgs.stdenv.mkDerivation {
         name = "cardano-types";
-        version = "v4.0.0";
+        version = "19b235caffe615997e782e596e7853e2f9445ccc";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-cardano-types";
-          rev = "46cc078af59926c566a38307cd34c40049e7880c";
-          sha256 = "1m7asca6qsc8sd2lzp6ahiyxms1cvs5nqzwl5s2wwd3h4fv7w7cy";
+          rev = "19b235caffe615997e782e596e7853e2f9445ccc";
+          sha256 = "1726fzszw0rp9jjw6r5y1363w1zydzzisjiabqkc474ly9z7208c";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";
@@ -1267,11 +1267,11 @@ let
 
     "plutus-types" = pkgs.stdenv.mkDerivation {
         name = "plutus-types";
-        version = "v1.0.1";
+        version = "b96f3ddb3acee2dae6c16f3552dd50fd6c97acdc";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-plutus-types";
-          rev = "dfec05e2dee79ee8dafad3d698906966ea6628bb";
-          sha256 = "0milz16kdl1pd0i6b8ibxpacdd2r7p6n96gl1g6h41v9bccs69p9";
+          rev = "b96f3ddb3acee2dae6c16f3552dd50fd6c97acdc";
+          sha256 = "1cpga9ij8qicqpl30q8c2gw83vaby8gdbzqpay0lx16p4551cgna";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";
@@ -1675,11 +1675,11 @@ let
 
     "uplc-apply-args" = pkgs.stdenv.mkDerivation {
         name = "uplc-apply-args";
-        version = "v1.0.0";
+        version = "6a1200d7402c9283bafdd2df1828b9b6fd6ecfc0";
         src = pkgs.fetchgit {
           url = "https://github.com/mlabs-haskell/purescript-uplc-apply-args";
-          rev = "aa528d5310cbfbd01b4d94557f404d95cfb6bb3c";
-          sha256 = "1r064ca2m16hkbcswrvlng032ax1ygbpr2gxrlaqmjlf2gnin280";
+          rev = "6a1200d7402c9283bafdd2df1828b9b6fd6ecfc0";
+          sha256 = "1gw0w0ppf3zx30jmjapmj928j28xx5nxfnml2a42fc18l5nyclrg";
         };
         phases = "installPhase";
         installPhase = "ln -s $src $out";

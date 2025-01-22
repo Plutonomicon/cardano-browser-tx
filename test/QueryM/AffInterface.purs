@@ -2,7 +2,7 @@ module Test.Ctl.QueryM.AffInterface (suite) where
 
 import Prelude
 
-import Cardano.Serialization.Lib (fromBytes)
+import Cardano.Data.Lite (fromBytes)
 import Contract.Transaction (TransactionHash(TransactionHash))
 import Control.Monad.Except (throwError)
 import Ctl.Internal.QueryM (QueryM, getChainTip, submitTxOgmios)

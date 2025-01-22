@@ -83,7 +83,7 @@ import Affjax.RequestHeader (RequestHeader(ContentType, RequestHeader)) as Affja
 import Affjax.ResponseFormat (string) as Affjax.ResponseFormat
 import Affjax.StatusCode (StatusCode(StatusCode)) as Affjax
 import Cardano.AsCbor (decodeCbor, encodeCbor)
-import Cardano.Serialization.Lib (toBytes)
+import Cardano.Data.Lite (toBytes)
 import Cardano.Types
   ( AssetClass(AssetClass)
   , AuxiliaryData

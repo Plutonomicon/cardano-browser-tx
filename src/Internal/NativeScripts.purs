@@ -6,7 +6,7 @@ module Ctl.Internal.NativeScripts
 
 import Prelude
 
-import Cardano.Serialization.Lib (nativeScript_hash)
+import Cardano.Data.Lite (nativeScript_hash)
 import Cardano.Types (Ed25519KeyHash, ScriptHash)
 import Cardano.Types.NativeScript
   ( NativeScript

@@ -17,7 +17,7 @@
   , "cardano-key-wallet"
   , "cardano-message-signing"
   , "cardano-plutus-data-schema"
-  , "cardano-serialization-lib"
+  , "cardano-data-lite"
   , "cardano-transaction-builder"
   , "cardano-types"
   , "checked-exceptions"

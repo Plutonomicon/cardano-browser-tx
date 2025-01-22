@@ -191,7 +191,7 @@ let additions =
         , repo = "https://github.com/mlabs-haskell/purescript-bytearrays"
         , version = "v1.0.0"
         }
-      , cardano-serialization-lib =
+      , cardano-data-lite =
         { dependencies =
           [ "aeson"
           , "aff"
@@ -212,9 +212,8 @@ let additions =
           , "tuples"
           , "unsafe-coerce"
           ]
-        , repo =
-            "https://github.com/mlabs-haskell/purescript-cardano-serialization-lib"
-        , version = "v3.0.0"
+        , repo = "https://github.com/mlabs-haskell/purescript-cardano-data-lite"
+        , version = "55c8d58ba5d60ebb3f19a30adbd37cf2cd269ade"
         }
       , cardano-plutus-data-schema =
         { dependencies = [ "prelude" ]
@@ -250,7 +249,7 @@ let additions =
           , "tuples"
           ]
         , repo = "https://github.com/mlabs-haskell/purescript-plutus-types"
-        , version = "v1.0.1"
+        , version = "b96f3ddb3acee2dae6c16f3552dd50fd6c97acdc"
         }
       , cip30-mock =
         { dependencies =
@@ -276,7 +275,7 @@ let additions =
           ]
         , repo =
             "https://github.com/mlabs-haskell/purescript-cardano-collateral-select"
-        , version = "v1.0.0"
+        , version = "fed22134275a4668d9458cbebba566667c4cafe0"
         }
       , cardano-key-wallet =
         { dependencies =
@@ -297,13 +296,13 @@ let additions =
           ]
         , repo =
             "https://github.com/mlabs-haskell/purescript-cardano-key-wallet"
-        , version = "v2.0.0"
+        , version = "3d7dd4e1e3dfa04b2d5c81dd857da356c4372ea1"
         }
       , uplc-apply-args =
         { dependencies =
           [ "aff"
           , "bytearrays"
-          , "cardano-serialization-lib"
+          , "cardano-data-lite"
           , "cardano-types"
           , "effect"
           , "either"
@@ -322,7 +321,7 @@ let additions =
           , "tuples"
           ]
         , repo = "https://github.com/mlabs-haskell/purescript-uplc-apply-args"
-        , version = "v1.0.0"
+        , version = "6a1200d7402c9283bafdd2df1828b9b6fd6ecfc0"
         }
       , cardano-types =
         { dependencies =
@@ -333,7 +332,7 @@ let additions =
           , "bifunctors"
           , "bytearrays"
           , "cardano-plutus-data-schema"
-          , "cardano-serialization-lib"
+          , "cardano-data-lite"
           , "control"
           , "datetime"
           , "effect"
@@ -372,7 +371,7 @@ let additions =
           , "unsafe-coerce"
           ]
         , repo = "https://github.com/mlabs-haskell/purescript-cardano-types"
-        , version = "v4.0.0"
+        , version = "19b235caffe615997e782e596e7853e2f9445ccc"
         }
       , cardano-message-signing =
         { dependencies =
@@ -385,11 +384,11 @@ let additions =
           ]
         , repo =
             "https://github.com/mlabs-haskell/purescript-cardano-message-signing"
-        , version = "v1.0.0"
+        , version = "698a0ca76c395a96c84c5955a92a0962e51904cb"
         }
       , cardano-hd-wallet =
         { dependencies =
-          [ "cardano-serialization-lib"
+          [ "cardano-data-lite"
           , "cardano-types"
           , "console"
           , "effect"
@@ -398,7 +397,7 @@ let additions =
           , "uint"
           ]
         , repo = "https://github.com/mlabs-haskell/purescript-cardano-hd-wallet"
-        , version = "cc1073ddf8bce72407ef6671e3decb59f422e304"
+        , version = "1e3aacfb1ea083aed9f1af06a85e367326e03528"
         }
       , cardano-transaction-builder =
         { dependencies =
@@ -409,7 +408,7 @@ let additions =
           , "bifunctors"
           , "bytearrays"
           , "cardano-plutus-data-schema"
-          , "cardano-serialization-lib"
+          , "cardano-data-lite"
           , "cardano-types"
           , "console"
           , "control"
@@ -453,7 +452,7 @@ let additions =
           ]
         , repo =
             "https://github.com/mlabs-haskell/purescript-cardano-transaction-builder"
-        , version = "v2.0.0"
+        , version = "4a064fdff00a864c114e2ff7b6655d1cca4adb20"
         }
       , mote-testplan =
         { dependencies =

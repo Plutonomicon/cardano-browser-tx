@@ -4,7 +4,7 @@ module Test.Ctl.Fixtures.CostModels
 
 import Prelude
 
-import Cardano.Serialization.Lib (Costmdls, unpackMapContainerToMapWith)
+import Cardano.Data.Lite (Costmdls, unpackMapContainerToMapWith)
 import Cardano.Types (CostModel, Language)
 import Cardano.Types.CostModel as CostModel
 import Cardano.Types.Language as Language

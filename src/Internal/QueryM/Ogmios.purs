@@ -92,7 +92,7 @@ import Aeson
   , (.:?)
   )
 import Cardano.AsCbor (decodeCbor, encodeCbor)
-import Cardano.Serialization.Lib (fromBytes, ipv4_new)
+import Cardano.Data.Lite (fromBytes, ipv4_new)
 import Cardano.Types
   ( Bech32String
   , BigNum(BigNum)

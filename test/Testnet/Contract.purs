@@ -6,7 +6,7 @@ import Prelude
 
 import Cardano.AsCbor (decodeCbor)
 import Cardano.Plutus.ApplyArgs (applyArgs)
-import Cardano.Serialization.Lib (fromBytes)
+import Cardano.Data.Lite (fromBytes)
 import Cardano.Transaction.Builder
   ( DatumWitness(DatumValue)
   , OutputWitness(PlutusScriptOutput)

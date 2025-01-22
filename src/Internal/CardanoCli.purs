@@ -7,7 +7,7 @@ module Ctl.Internal.CardanoCli
 
 import Contract.Prelude
 
-import Cardano.Serialization.Lib as CSL
+import Cardano.Data.Lite as CSL
 import Cardano.Types as Cardano.Types
 import Cardano.Types.Address as Cardano.Types.Address
 import Cardano.Types.AssetName as Cardano.Types.AssetName

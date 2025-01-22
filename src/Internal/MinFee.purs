@@ -3,7 +3,7 @@ module Ctl.Internal.MinFee (calculateMinFeeCsl) where
 
 import Prelude
 
-import Cardano.Serialization.Lib
+import Cardano.Data.Lite
   ( linearFee_new
   , minFee
   , minRefScriptFee

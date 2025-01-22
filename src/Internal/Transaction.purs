@@ -8,7 +8,7 @@ module Ctl.Internal.Transaction
 
 import Prelude
 
-import Cardano.Serialization.Lib
+import Cardano.Data.Lite
   ( hashScriptData
   , packListContainer
   , packMapContainer

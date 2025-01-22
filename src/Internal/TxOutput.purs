@@ -10,7 +10,7 @@ module Ctl.Internal.TxOutput
 import Prelude
 
 import Cardano.AsCbor (decodeCbor, encodeCbor)
-import Cardano.Serialization.Lib (fromBytes, toBytes)
+import Cardano.Data.Lite (fromBytes, toBytes)
 import Cardano.Types
   ( DataHash
   , PlutusData
