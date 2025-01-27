@@ -8,6 +8,7 @@ module Ctl.Internal.Spawn
   , spawn
   , exec
   , stop
+  , stopProcessWithChildren
   , waitForStop
   , cleanupTmpDir
   , cleanupOnSigint
@@ -89,13 +90,15 @@ spawn' cmd args opts mbFilter cont = do
   child <- ChildProcess.spawn cmd args opts
   let fullCmd = cmd <> foldMap (" " <> _) args
   closedAVar <- AVar.empty
-  interface <- RL.createInterface (stdout child) mempty
+  stdoutInterfaceRef <- Ref.new Nothing
   stderrInterface <- RL.createInterface (stderr child) mempty
   flip RL.setLineHandler stderrInterface \str -> do
     traceM $ "stderr: " <> str
   outputRef <- Ref.new ""
   ChildProcess.onClose child \code -> do
-    RL.close interface
+    stdoutInterface <- Ref.read stdoutInterfaceRef
+    traverse_ RL.close stdoutInterface
+    RL.close stderrInterface
     void $ AVar.tryPut code closedAVar
     output <- Ref.read outputRef
     cont $ Left $ error
@@ -112,16 +115,18 @@ spawn' cmd args opts mbFilter cont = do
   case mbFilter of
     Nothing -> cont (pure mp)
     Just filter -> do
-      flip RL.setLineHandler interface
+      stdoutInterface <- RL.createInterface (stdout child) mempty
+      Ref.write (Just stdoutInterface) stdoutInterfaceRef
+      flip RL.setLineHandler stdoutInterface
         \str -> do
           output <- Ref.modify (_ <> str <> "\n") outputRef
           filter { output, line: str } >>= case _ of
             Success -> do
-              clearLineHandler interface
+              clearLineHandler stdoutInterface
               cont (pure mp)
             Cancel -> do
               kill SIGINT child
-              clearLineHandler interface
+              clearLineHandler stdoutInterface
               cont $ Left $ error
                 $ "Process cancelled because output received: "
                 <> str
@@ -176,6 +181,13 @@ stop (ManagedProcess _ child closedAVar) = do
   isAlive <- AVar.isEmpty <$> AVar.status closedAVar
   when isAlive $ liftEffect $ kill SIGINT child
 
+stopProcessWithChildren :: ManagedProcess -> Aff Unit
+stopProcessWithChildren managedProc@(ManagedProcess _ proc _) = do
+  void $ liftEffect $ Node.ChildProcess.execSync
+    ("pkill -TERM -P " <> show (unwrap $ Node.ChildProcess.pid proc))
+    Node.ChildProcess.defaultExecSyncOptions
+  stop managedProc
+
 -- | Waits until the process has cleanly stopped.
 waitForStop :: ManagedProcess -> Aff Unit
 waitForStop (ManagedProcess cmd _ closedAVar) = do
@@ -195,12 +207,12 @@ onSignal :: Signal -> Effect Unit -> Effect OnSignalRef
 onSignal sig = onSignalImpl (Signal.toString sig)
 
 -- | Just as onSignal, but Aff.
-waitForSignal :: Signal -> Aff Unit
+waitForSignal :: Signal -> Aff Signal
 waitForSignal signal = makeAff \cont -> do
   isCanceledRef <- Ref.new false
   onSignalRef <- onSignal signal
     $ Ref.read isCanceledRef
-    >>= flip unless (cont $ Right unit)
+    >>= flip unless (cont $ Right signal)
   pure $ Canceler \err -> liftEffect do
     Ref.write true isCanceledRef
     removeOnSignal onSignalRef

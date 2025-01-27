@@ -49,6 +49,7 @@ module Ctl.Internal.Service.Blockfrost
   , getScriptByHash
   , getScriptInfo
   , getSystemStart
+  , getTxAuxiliaryData
   , getTxMetadata
   , getUtxoByOref
   , getValidatorHashDelegationsAndRewards
@@ -85,9 +86,10 @@ import Cardano.AsCbor (decodeCbor, encodeCbor)
 import Cardano.Serialization.Lib (toBytes)
 import Cardano.Types
   ( AssetClass(AssetClass)
+  , AuxiliaryData
   , DataHash
   , GeneralTransactionMetadata(GeneralTransactionMetadata)
-  , Language(PlutusV1, PlutusV2, PlutusV3)
+  , Language(PlutusV3, PlutusV2, PlutusV1)
   , PlutusData
   , PoolPubKeyHash
   , RawBytes
@@ -116,6 +118,7 @@ import Cardano.Types.Epoch (Epoch(Epoch))
 import Cardano.Types.ExUnitPrices (ExUnitPrices(ExUnitPrices))
 import Cardano.Types.ExUnits (ExUnits(ExUnits))
 import Cardano.Types.GeneralTransactionMetadata as GeneralTransactionMetadata
+import Cardano.Types.Int (Int) as Cardano
 import Cardano.Types.NativeScript
   ( NativeScript
       ( ScriptAll
@@ -128,6 +131,7 @@ import Cardano.Types.NativeScript
   )
 import Cardano.Types.NetworkId (NetworkId)
 import Cardano.Types.OutputDatum (OutputDatum(OutputDatum, OutputDatumHash))
+import Cardano.Types.PlutusScript (PlutusScript)
 import Cardano.Types.PlutusScript as PlutusScript
 import Cardano.Types.PoolPubKeyHash as PoolPubKeyHash
 import Cardano.Types.RedeemerTag (RedeemerTag(Spend, Mint, Cert, Reward)) as RedeemerTag
@@ -192,15 +196,17 @@ import Ctl.Internal.Types.EraSummaries
 import Ctl.Internal.Types.ProtocolParameters
   ( CostModelV1
   , CostModelV2
-  , CostModelV3
   , ProtocolParameters(ProtocolParameters)
   , convertPlutusV1CostModel
   , convertPlutusV2CostModel
   , convertPlutusV3CostModel
+  , convertUnnamedPlutusCostModel
   )
 import Ctl.Internal.Types.Rational (Rational, reduce)
+import Ctl.Internal.Types.Rational as Rational
 import Ctl.Internal.Types.StakeValidatorHash (StakeValidatorHash)
 import Ctl.Internal.Types.SystemStart (SystemStart(SystemStart))
+import Data.Array (catMaybes)
 import Data.Array (find, length) as Array
 import Data.Bifunctor (lmap)
 import Data.BigNumber (BigNumber, toFraction)
@@ -236,6 +242,7 @@ import Effect.Exception (error)
 import Foreign.Object (Object)
 import Foreign.Object as ForeignObject
 import JS.BigInt (fromString, toNumber) as BigInt
+import Prim.TypeError (class Warn, Text)
 
 --------------------------------------------------------------------------------
 -- BlockfrostServiceM
@@ -673,23 +680,79 @@ doesTxExist txHash = do
     Left e -> Left e
 
 --------------------------------------------------------------------------------
--- Get transaction metadata
---------------------------------------------------------------------------------
+-- Get transaction auxiliary data
+getTxAuxiliaryData
+  :: TransactionHash
+  -> BlockfrostServiceM (Either GetTxMetadataError AuxiliaryData)
+getTxAuxiliaryData txHash = runExceptT do
+  metadata <- ExceptT $ getMetadata
+  scriptRefs <- ExceptT $ getTxScripts txHash
+  pure $ wrap
+    { metadata: Just metadata
+    , nativeScripts: arrayToMaybe $ getNativeScripts scriptRefs
+    , plutusScripts: arrayToMaybe $ getPlutusScripts scriptRefs
+    }
+
+  where
+
+  getMetadata = do
+    response <- blockfrostGetRequest (TransactionMetadata txHash)
+    pure case unwrapBlockfrostMetadata <$> handleBlockfrostResponse response of
+      Left (ClientHttpResponseError (Affjax.StatusCode 404) _) ->
+        Left GetTxMetadataTxNotFoundError
+      Left e -> Left (GetTxMetadataClientError e)
+      Right metadata
+        | Map.isEmpty (unwrap metadata) ->
+            Left GetTxMetadataMetadataEmptyOrMissingError
+        | otherwise -> Right metadata
+
+  getNativeScripts :: Array ScriptRef -> Array NativeScript
+  getNativeScripts = catMaybes <<< map isNativeScript
+    where
+    isNativeScript (NativeScriptRef script) = Just script
+    isNativeScript (PlutusScriptRef _) = Nothing
+
+  getPlutusScripts :: Array ScriptRef -> Array PlutusScript
+  getPlutusScripts = catMaybes <<< map isPlutusScript
+    where
+    isPlutusScript (PlutusScriptRef script) = Just script
+    isPlutusScript (NativeScriptRef _) = Nothing
+
+  arrayToMaybe :: forall a. Array a -> Maybe (Array a)
+  arrayToMaybe [] = Nothing
+  arrayToMaybe xs = Just xs
 
 getTxMetadata
-  :: TransactionHash
+  :: Warn
+       ( Text
+           "deprecated: getTxMetadata. use Ctl.Internal.Service.Blockfrost.getTxAuxiliaryData"
+       )
+  => TransactionHash
   -> BlockfrostServiceM (Either GetTxMetadataError GeneralTransactionMetadata)
 getTxMetadata txHash = do
-  response <- blockfrostGetRequest (TransactionMetadata txHash)
-  pure case unwrapBlockfrostMetadata <$> handleBlockfrostResponse response of
-    Left (ClientHttpResponseError (Affjax.StatusCode 404) _) ->
-      Left GetTxMetadataTxNotFoundError
-    Left e ->
-      Left (GetTxMetadataClientError e)
-    Right metadata
-      | Map.isEmpty (unwrap metadata) ->
-          Left GetTxMetadataMetadataEmptyOrMissingError
-      | otherwise -> Right metadata
+  eAuxData <- getTxAuxiliaryData txHash
+  pure $ case eAuxData of
+    Left err -> Left err
+    Right auxiliaryData -> case (unwrap auxiliaryData).metadata of
+      Nothing -> Left GetTxMetadataMetadataEmptyOrMissingError
+      Just metadata -> Right metadata
+
+getTxScripts
+  :: TransactionHash
+  -> BlockfrostServiceM (Either GetTxMetadataError (Array ScriptRef))
+getTxScripts txHash = runExceptT do
+  (blockfrostUtxoMap :: BlockfrostUtxosOfTransaction) <- ExceptT $
+    blockfrostGetRequest (UtxosOfTransaction txHash)
+      <#> lmap GetTxMetadataClientError <<< handle404AsMempty <<<
+        handleBlockfrostResponse
+  let
+    (scriptHashes :: Array ScriptHash) = catMaybes
+      $ map (_.scriptHash <<< unwrap <<< snd)
+      $ unwrap blockfrostUtxoMap
+  catMaybes <$> traverse (ExceptT <<< scriptByHash) scriptHashes
+
+  where
+  scriptByHash t = (lmap GetTxMetadataClientError) <$> getScriptByHash t
 
 --------------------------------------------------------------------------------
 -- Get current epoch information
@@ -1123,15 +1186,24 @@ instance Show BlockfrostUtxosOfTransaction where
 instance DecodeAeson BlockfrostUtxosOfTransaction where
   decodeAeson = aesonObject \obj -> do
     txHash <- getField obj "hash"
-    getField obj "outputs"
-      >>= aesonArray (map wrap <<< traverse (decodeUtxoEntry txHash))
+    outputs <- getField obj "outputs"
+    aesonArray (map (wrap <<< catMaybes) <<< traverse (decodeUtxoEntry txHash))
+      outputs
     where
     decodeUtxoEntry
       :: TransactionHash
       -> Aeson
-      -> Either JsonDecodeError BlockfrostUnspentOutput
-    decodeUtxoEntry txHash utxoAeson =
-      Tuple <$> decodeTxOref txHash utxoAeson <*> decodeAeson utxoAeson
+      -> Either JsonDecodeError (Maybe BlockfrostUnspentOutput)
+    decodeUtxoEntry txHash utxoAeson = do
+      (consumedByTx :: Maybe String) <- aesonObject
+        (flip getFieldOptional' "consumed_by_tx")
+        utxoAeson
+      case consumedByTx of
+        Nothing ->
+          Just <$>
+            (Tuple <$> decodeTxOref txHash utxoAeson <*> decodeAeson utxoAeson)
+        Just _ ->
+          pure Nothing
 
     decodeTxOref
       :: TransactionHash -> Aeson -> Either JsonDecodeError TransactionInput
@@ -1460,7 +1532,7 @@ type BlockfrostProtocolParametersRaw =
   , "cost_models" ::
       { "PlutusV1" :: { | CostModelV1 }
       , "PlutusV2" :: { | CostModelV2 }
-      , "PlutusV3" :: CostModelV3
+      , "PlutusV3" :: Object Cardano.Int
       }
   , "price_mem" :: FiniteBigNumber
   , "price_step" :: FiniteBigNumber
@@ -1472,6 +1544,9 @@ type BlockfrostProtocolParametersRaw =
   , "collateral_percent" :: UInt
   , "max_collateral_inputs" :: UInt
   , "coins_per_utxo_size" :: Maybe (Stringed BigNum)
+  , "gov_action_deposit" :: Stringed BigNum
+  , "drep_deposit" :: Stringed BigNum
+  , "min_fee_ref_script_cost_per_byte" :: UInt
   }
 
 toFraction' :: BigNumber -> String /\ String
@@ -1525,9 +1600,19 @@ instance DecodeAeson BlockfrostProtocolParameters where
       maybe (Left $ AtKey "coins_per_utxo_size" $ MissingValue)
         pure $ (Coin <<< unwrap <$> raw.coins_per_utxo_size)
 
-    plutusV3CostModel <- note (AtKey "PlutusV3" $ TypeMismatch "CostModel") $
-      convertPlutusV3CostModel raw.cost_models."PlutusV3"
-
+    refScriptCoinsPerByte <-
+      note (AtKey "min_fee_ref_script_cost_per_byte" $ TypeMismatch "Integer") $
+        Rational.reduce
+          ( BigNum.toBigInt $ BigNum.fromUInt
+              raw.min_fee_ref_script_cost_per_byte
+          )
+          one
+    let plutusV3CostModelRaw = raw.cost_models."PlutusV3"
+    plutusV3CostModel <-
+      note (AtKey "cost_models" $ AtKey "PlutusV3" $ TypeMismatch "CostModel")
+        ( convertPlutusV3CostModel plutusV3CostModelRaw
+            <|> convertUnnamedPlutusCostModel plutusV3CostModelRaw
+        )
     pure $ BlockfrostProtocolParameters $ ProtocolParameters
       { protocolVersion: raw.protocol_major_ver /\ raw.protocol_minor_ver
       -- The following two parameters were removed from Babbage
@@ -1565,6 +1650,9 @@ instance DecodeAeson BlockfrostProtocolParameters where
       , maxValueSize: unwrap raw.max_val_size
       , collateralPercent: raw.collateral_percent
       , maxCollateralInputs: raw.max_collateral_inputs
+      , govActionDeposit: Coin $ unwrap raw.gov_action_deposit
+      , drepDeposit: Coin $ unwrap raw.drep_deposit
+      , refScriptCoinsPerByte
       }
 
 --------------------------------------------------------------------------------

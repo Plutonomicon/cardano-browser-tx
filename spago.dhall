@@ -1,7 +1,3 @@
-{-
-Welcome to a Spago project!
-You can edit this file as you like.
--}
 { name = "cardano-transaction-lib"
 , dependencies =
   [ "aeson"
@@ -18,15 +14,18 @@ You can edit this file as you like.
   , "bignumber"
   , "bytearrays"
   , "cardano-hd-wallet"
-  , "uplc-apply-args"
+  , "cardano-key-wallet"
+  , "cardano-message-signing"
   , "cardano-plutus-data-schema"
   , "cardano-serialization-lib"
-  , "cardano-key-wallet"
+  , "cardano-transaction-builder"
   , "cardano-types"
   , "checked-exceptions"
   , "cip30"
   , "cip30-mock"
   , "cip30-typesafe"
+  , "cip95"
+  , "cip95-typesafe"
   , "console"
   , "control"
   , "crypto"
@@ -103,6 +102,7 @@ You can edit this file as you like.
   , "unfoldable"
   , "unsafe-coerce"
   , "untagged-union"
+  , "uplc-apply-args"
   , "variant"
   , "web-html"
   , "web-storage"

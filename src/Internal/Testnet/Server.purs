@@ -5,11 +5,13 @@ module Ctl.Internal.Testnet.Server
   , startOgmios
   , startTestnetCluster
   , makeClusterContractEnv
+  , mkLogging
   ) where
 
-import Contract.Prelude
+import Contract.Prelude hiding (log)
 
-import Cardano.Types (NetworkId(MainnetId))
+import Cardano.Types (NetworkId(TestnetId))
+import Cardano.Types.BigNum (maxValue, toString) as BigNum
 import Contract.Config (Hooks, defaultSynchronizationParams, defaultTimeParams)
 import Contract.Monad (ContractEnv)
 import Control.Alt ((<|>))
@@ -23,39 +25,36 @@ import Ctl.Internal.Contract.Monad
   , stopContractEnv
   )
 import Ctl.Internal.Contract.QueryBackend (mkCtlBackendParams)
-import Ctl.Internal.Helpers ((<</>>))
+import Ctl.Internal.Helpers (concatPaths, (<</>>))
 import Ctl.Internal.Logging (Logger, mkLogger, setupLogs)
-import Ctl.Internal.QueryM.UniqueId (uniqueId)
 import Ctl.Internal.ServerConfig (ServerConfig)
 import Ctl.Internal.Spawn
   ( ManagedProcess(ManagedProcess)
   , NewOutputAction(NoOp, Success)
   , _rmdirSync
   , isPortAvailable
-  , killProcessWithPort
   , spawn
   , stop
+  , stopProcessWithChildren
   )
 import Ctl.Internal.Testnet.Types
-  ( Node
-  , TestnetClusterConfig
+  ( TestnetClusterConfig
   , TestnetConfig
   , TestnetPaths
   )
 import Ctl.Internal.Testnet.Utils
   ( EventSource
+  , TestnetCleanupRef
   , addCleanup
   , after
   , annotateError
-  , findNodeDirs
   , findTestnetPaths
   , getRuntime
   , onLine
-  , readNodes
   , runCleanup
   , scheduleCleanup
   , suppressAndLogErrors
-  , tmpdir
+  , tmpdirUnique
   , tryAndLogErrors
   , waitForClose
   , waitForError
@@ -63,35 +62,40 @@ import Ctl.Internal.Testnet.Utils
   , waitUntil
   )
 import Ctl.Internal.Types.UsedTxOuts (newUsedTxOuts)
+import Data.Array (head) as Array
 import Data.Log.Message (Message)
 import Data.Maybe (Maybe(Nothing, Just))
 import Data.Set as Set
-import Data.String (stripPrefix, trim) as String
+import Data.String (split, stripPrefix, trim) as String
 import Data.String.CodeUnits (indexOf) as String
 import Data.String.Pattern (Pattern(Pattern))
 import Data.Time.Duration (Milliseconds(Milliseconds))
 import Data.UInt (UInt)
 import Data.UInt (toString) as UInt
-import Debug (spy)
+import Effect.AVar (tryPut) as AVarSync
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
+import Effect.Aff.AVar (empty, take) as AVar
 import Effect.Aff.Retry
   ( RetryPolicy
   , constantDelay
   , limitRetriesByCumulativeDelay
   , recovering
   )
+import Effect.Class (class MonadEffect)
+import Effect.Console (log)
 import Effect.Exception (Error, error, throw)
 import Effect.Ref (Ref)
-import Effect.Ref (modify_, new, read, write) as Ref
+import Effect.Ref (modify_, new) as Ref
 import Foreign.Object as Object
-import Node.ChildProcess (defaultSpawnOptions)
+import Node.ChildProcess (defaultSpawnOptions, stdout)
 import Node.ChildProcess as Node.ChildProcess
 import Node.Encoding (Encoding(UTF8))
-import Node.FS.Sync (exists, mkdir) as FSSync
+import Node.FS.Sync (readdir) as FSSync
 import Node.FS.Sync as Node.FS
 import Node.Path (FilePath)
 import Node.Process as Node.Process
+import Node.Stream (onDataString)
 
 type Channels a =
   { stderr :: EventSource a
@@ -156,13 +160,7 @@ startKupo
   -> Ref (Array (Aff Unit))
   -> Aff (ManagedProcess /\ String)
 startKupo cfg params cleanupRef = do
-  tmpDir <- liftEffect tmpdir
-  randomStr <- liftEffect $ uniqueId ""
-  let
-    workdir = tmpDir <</>> randomStr <> "-kupo-db"
-  liftEffect do
-    workdirExists <- FSSync.exists workdir
-    unless workdirExists (FSSync.mkdir workdir)
+  workdir <- tmpdirUnique "kupo-db"
   childProcess <-
     after
       (spawnKupoProcess workdir)
@@ -213,11 +211,12 @@ startKupo cfg params cleanupRef = do
 startTestnetCluster
   :: TestnetConfig
   -> Ref (Array (Aff Unit))
+  -> Logger
   -> Aff StartedTestnetCluster
-startTestnetCluster cfg cleanupRef = do
+startTestnetCluster cfg cleanupRef logger = do
   { testnet, channels, workdirAbsolute } <-
     annotateError "Could not start cardano-testnet" $
-      startCardanoTestnet cfg.clusterConfig cleanupRef
+      startCardanoTestnet cfg.clusterConfig cleanupRef logger
 
   { paths } <- waitUntil (Milliseconds 4000.0)
     $ map hush
@@ -233,7 +232,6 @@ startTestnetCluster cfg cleanupRef = do
   kupo <- annotateError "Could not start kupo"
     $ startKupo' { paths, workdir: workdirAbsolute }
 
-  log "startTestnetCluster:done"
   pure $ MkStartedTestnetCluster
     { paths
     , ogmios
@@ -283,60 +281,42 @@ startTestnetCluster cfg cleanupRef = do
       }
     pure { process: ogmios, channels: ogmiosChannels }
 
--- | Runs cardano-testnet executable with provided params.
-spawnCardanoTestnet
-  :: { cwd :: FilePath }
-  -> TestnetClusterConfig
-  -> Aff { testnet :: ManagedProcess, workspace :: FilePath }
-spawnCardanoTestnet { cwd } params = do
+-- | Spawns cardano-testnet process with provided parameters.
+spawnCardanoTestnet :: FilePath -> TestnetClusterConfig -> Aff ManagedProcess
+spawnCardanoTestnet workdir params = do
   env <- liftEffect Node.Process.getEnv
-  -- initCwd <- liftMaybe (error "Couldn't find INIT_CWD env variable")
-  --   $ Object.lookup "INIT_CWD" env
   let
     env' = Object.fromFoldable
-      [ "TMPDIR" /\ cwd -- only for 8.1.1; 8.7.2 puts it's testnet directory into cwd instead
-      -- , "CARDANO_NODE_SRC" /\ (initCwd <</>> "cardano-testnet-files")
-      , "CARDANO_CLI" /\ "cardano-cli"
-      , "CREATE_SCRIPT_CONTEXT" /\ "create-script-context"
+      [ "CARDANO_CLI" /\ "cardano-cli"
       , "CARDANO_NODE" /\ "cardano-node"
-      , "CARDANO_SUBMIT_API" /\ "cardano-submit-api"
-      , "CARDANO_NODE_CHAIRMAN" /\ "cardano-node-chairman"
+      , "TMPDIR" /\ workdir
       ]
     opts = defaultSpawnOptions
-      { cwd = Just cwd, env = Just $ Object.union env' env }
-  workspaceRef <- liftEffect $ Ref.new mempty
-  ps <- spawn "cardano-testnet" (spy "cardano-testnet options: " options) opts $
-    Just
-      ( \{ line } ->
-          case String.stripPrefix (Pattern "Workspace: ") (String.trim line) of
-            Nothing -> pure NoOp
-            Just workspace -> do
-              void $ Ref.write workspace workspaceRef
-              pure Success
-      )
-  workspace <- liftEffect $ Ref.read workspaceRef
-  pure { testnet: ps, workspace }
+      { cwd = Just workdir
+      , env = Just $ Object.union env' env
+      , detached = true
+      }
+  spawn "cardano-testnet" options opts Nothing
   where
   flag :: String -> String
   flag name = "--" <> name
 
-  option :: forall a. Show a => String -> a -> Array String
-  option name value = [ flag name, show value ]
-
   options :: Array String
   options = join
     [ [ "cardano" ]
-    , option "testnet-magic" params.testnetMagic
     , [ flag $ show params.era ]
-    , option "slot-length" $ unwrap params.slotLength
     , maybe mempty
         (\epochSize -> [ flag "epoch-length", UInt.toString epochSize ])
         params.epochSize
+    , [ flag "slot-length", show (unwrap params.slotLength) ]
+    , [ flag "testnet-magic", show params.testnetMagic ]
+    , [ flag "max-lovelace-supply", BigNum.toString BigNum.maxValue ]
     ]
 
 startCardanoTestnet
   :: TestnetClusterConfig
-  -> Ref (Array (Aff Unit))
+  -> TestnetCleanupRef
+  -> Logger
   -> Aff
        { testnet :: ManagedProcess
        , channels ::
@@ -344,67 +324,83 @@ startCardanoTestnet
            , stdout :: EventSource String
            }
        , workdirAbsolute :: FilePath
-       , nodes :: Array { | Node () }
        }
-startCardanoTestnet params cleanupRef = annotateError "startCardanoTestnet" do
-  tmpDir <- liftEffect tmpdir
-  { testnet, workspace } <- spawnCardanoTestnet { cwd: tmpDir } params
-  channels <- liftEffect $ getChannels testnet
+startCardanoTestnet params cleanupRef logger =
+  annotateError "startCardanoTestnet" do
+    workdir <- tmpdirUnique "cardano-testnet"
+    testnet@(ManagedProcess _ testnetProcess _) <- scheduleCleanup
+      cleanupRef
+      (spawnCardanoTestnet workdir params)
+      stopProcessWithChildren
 
-  void $ Aff.forkAff $ annotateError "startCardanoTestnet:waitForErrorOrClose"
-    do
-      let
-        waitError = Just <$> waitForError testnet
-        waitClose = Nothing <$ waitForClose testnet
-      cause <- waitError <|> waitClose
+    workspaceFromLogsAvar <- AVar.empty
+    liftEffect $ onDataString (stdout testnetProcess) UTF8 \str -> do
+      let lines = String.split (Pattern "\n") str
+      traverse_
+        ( \line -> do
+            logger Trace $ "[cardano-testnet:stdout] " <> line
+            let
+              mWorkspace = String.stripPrefix (Pattern "Workspace: ") $
+                String.trim line
+            maybe (pure unit)
+              (void <<< flip AVarSync.tryPut workspaceFromLogsAvar)
+              mWorkspace
+        )
+        lines
+
+    workspace <- waitUntil (Milliseconds 100.0) $ findWorkspaceDir workdir
+    -- Schedule a cleanup immediately after the workspace
+    -- directory is created.
+    scheduleWorkspaceCleanup workspace
+    -- Wait for cardano-testnet to output the workspace, indicating
+    -- that initialization is complete.
+    workspaceFromLogs <- AVar.take workspaceFromLogsAvar
+
+    when (workspace /= workspaceFromLogs) do
       runCleanup cleanupRef
-      throwError $ fromMaybe (error "cardano-testnet process has exited") cause
+      -- this error should never happen
+      throwError $ error "cardano-testnet workspace mismatch"
 
-  nodes <-
-    waitUntil (Milliseconds 3000.0) $ liftEffect do
-      hush <$> tryAndLogErrors "startCardanoTestnet:waitForNodes" do
-        nodeDirs <- findNodeDirs { workdir: workspace }
-        readNodes { testnetDirectory: workspace, nodeDirs }
+    channels <- liftEffect $ getChannels testnet
+    attachStdoutMonitors testnet
+    pure { testnet, workdirAbsolute: workspace, channels }
+  where
+  findWorkspaceDir :: forall m. MonadEffect m => FilePath -> m (Maybe FilePath)
+  findWorkspaceDir workdir =
+    liftEffect $ map (concatPaths workdir) <<< Array.head <$>
+      FSSync.readdir workdir
 
-  liftEffect $
-    for_ nodes \{ port } ->
-      addCleanup cleanupRef (killProcessWithPort port)
+  attachStdoutMonitors :: ManagedProcess -> Aff Unit
+  attachStdoutMonitors testnet =
+    void $ Aff.forkAff $
+      annotateError "startCardanoTestnet:attachStdoutMonitors" do
+        let
+          waitError = Just <$> waitForError testnet
+          waitClose = Nothing <$ waitForClose testnet
+        cause <- waitError <|> waitClose
+        runCleanup cleanupRef
+        throwError $ fromMaybe (error "cardano-testnet process has exited")
+          cause
 
-  -- clean up on SIGINT
-  do
-    shouldCleanup <- liftEffect
-      $ Node.Process.lookupEnv "TESTNET_CLEANUP_WORKDIR"
-      <#> case _ of
-        Just "0" -> false
-        _ -> true
-    when shouldCleanup
-      $ liftEffect
-      $ addCleanup cleanupRef
-      $ liftEffect do
-          log "Cleaning up workidr"
+  scheduleWorkspaceCleanup :: forall m. MonadEffect m => FilePath -> m Unit
+  scheduleWorkspaceCleanup workspace =
+    liftEffect do
+      shouldCleanup <-
+        Node.Process.lookupEnv "TESTNET_CLEANUP_WORKDIR" <#>
+          case _ of
+            Just "0" -> false
+            _ -> true
+      when shouldCleanup do
+        addCleanup cleanupRef $ liftEffect do
+          logger Trace $ "Cleaning up cardano-testnet workspace: " <> workspace
           _rmdirSync workspace
 
-  _ <- redirectChannels
-    { stderr: channels.stderr, stdout: channels.stdout }
-    { stdoutTo:
-        { log: Just $ workspace <</>> "cardano-testnet.stdout.log"
-        , console: Nothing
-        }
-    , stderrTo:
-        { log: Just $ workspace <</>> "cardano-testnet.stderr.log"
-        , console: Nothing
-        }
-    }
+type StdStreams =
+  { stderr :: EventSource String
+  , stdout :: EventSource String
+  }
 
-  log "startCardanoTestnet:done"
-  pure { testnet, workdirAbsolute: workspace, channels, nodes }
-
-getChannels
-  :: ManagedProcess
-  -> Effect
-       { stderr :: EventSource String
-       , stdout :: EventSource String
-       }
+getChannels :: ManagedProcess -> Effect StdStreams
 getChannels (ManagedProcess _ process _) = ado
   stdout <- onLine (Node.ChildProcess.stdout process) Just
   stderr <- onLine (Node.ChildProcess.stderr process) Just
@@ -413,9 +409,7 @@ getChannels (ManagedProcess _ process _) = ado
 -- Note: it will not throw, so to check the computation result
 -- Fiber must be inspected.
 redirectChannels
-  :: { stderr :: EventSource String
-     , stdout :: EventSource String
-     }
+  :: StdStreams
   -> { stderrTo :: { log :: Maybe FilePath, console :: Maybe String }
      , stdoutTo :: { log :: Maybe FilePath, console :: Maybe String }
      }
@@ -547,7 +541,7 @@ makeNaiveClusterContractEnv cfg logger customLogger = do
   pure
     { backend
     , handle: mkQueryHandle cfg backend
-    , networkId: MainnetId
+    , networkId: TestnetId
     , logLevel: cfg.logLevel
     , customLogger: customLogger
     , suppressLogs: cfg.suppressLogs
@@ -565,25 +559,25 @@ makeNaiveClusterContractEnv cfg logger customLogger = do
 makeClusterContractEnv
   :: forall r
    . Ref (Array (Aff Unit))
-  -> Record (ClusterConfig r)
+  -> { updatedConfig :: Record (ClusterConfig r)
+     , logger :: Logger
+     , customLogger :: Maybe (LogLevel -> Message -> Aff Unit)
+     , printLogs :: Aff Unit
+     , clearLogs :: Aff Unit
+     }
   -> Aff
        { env :: ContractEnv
        , clearLogs :: Aff Unit
        , printLogs :: Aff Unit
        }
-makeClusterContractEnv cleanupRef cfg = do
-  { updatedConfig
-  , logger
-  , customLogger
-  , printLogs
-  , clearLogs
-  } <- liftEffect $ mkLogging cfg
+makeClusterContractEnv
+  cleanupRef
+  { updatedConfig, logger, customLogger, printLogs, clearLogs } =
   cleanupBracket
     cleanupRef
     (makeNaiveClusterContractEnv updatedConfig logger customLogger)
     stopContractEnv
-    $ pure
-    <<< { env: _, printLogs, clearLogs }
+    (pure <<< { env: _, printLogs, clearLogs })
 
 -- | Kill a process and wait for it to stop listening on a specific port.
 stopChildProcessWithPort :: UInt -> ManagedProcess -> Aff Unit

@@ -133,6 +133,9 @@ let
                 [
                   pkgs.ogmios
                   pkgs.kupo
+                  pkgs.cardano-testnet
+                  pkgs.cardano-node
+                  pkgs.cardano-cli
                 ]
               )
             )
@@ -353,6 +356,7 @@ let
           cardano-node
           cardano-cli
           psmisc
+          procps
         ]
         ++ (args.buildInputs or [ ]);
       }
@@ -449,7 +453,7 @@ let
           cardano-node
           cardano-cli
           chromium
-          python38 # To serve bundled CTL
+          python39 # To serve bundled CTL
           # Utils needed by E2E test code
           which # used to check for browser availability
           gnutar # used unpack settings archive within E2E test code

@@ -82,7 +82,7 @@ check-format: check-explicit-exports check-examples-imports check-whitespace
 	@purs-tidy check ${ps-sources}
 	@nixpkgs-fmt --check ${nix-sources}
 	@prettier --log-level warn -c ${js-sources}
-	@eslint --quiet ${js-sources} --parser-options 'sourceType: module'
+	@eslint --quiet ${js-sources}
 
 format:
 	@purs-tidy format-in-place ${ps-sources}
@@ -101,11 +101,8 @@ query-preprod-testnet-tip:
 	CARDANO_NODE_SOCKET_PATH=${preprod-node-ipc}/node.socket cardano-cli query tip \
 	  --testnet-magic 1
 
-run-ci-actions:
+run-ci-actions: run-template-checks
 	nix build -L .#checks.x86_64-linux.formatting-check
-	nix build -L .#checks.x86_64-linux.template-deps-json
-	nix build -L .#checks.x86_64-linux.template-dhall-diff
-	nix build -L .#checks.x86_64-linux.template-version
 	nix build -L .#checks.x86_64-linux.ctl-unit-test
 	nix build -L .#checks.x86_64-linux.ctl-e2e-test
 	nix build -L .#checks.x86_64-linux.ctl-local-testnet-test

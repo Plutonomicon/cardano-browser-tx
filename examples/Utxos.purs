@@ -2,13 +2,32 @@ module Ctl.Examples.Utxos (main, example, contract) where
 
 import Contract.Prelude
 
+import Cardano.Transaction.Builder
+  ( CredentialWitness(PlutusScriptCredential)
+  , ScriptWitness(ScriptValue)
+  , TransactionBuilderStep(Pay, MintAsset)
+  )
+import Cardano.Types
+  ( Credential(PubKeyHashCredential)
+  , OutputDatum(OutputDatum, OutputDatumHash)
+  , PaymentCredential(PaymentCredential)
+  , StakeCredential(StakeCredential)
+  , TransactionOutput(TransactionOutput)
+  )
 import Cardano.Types.BigNum as BigNum
+import Cardano.Types.DataHash (hashPlutusData)
 import Cardano.Types.Int as Int
-import Cardano.Types.Mint (Mint)
-import Cardano.Types.Mint as Mint
 import Cardano.Types.PlutusScript as PlutusScript
-import Contract.Address (PaymentPubKeyHash, StakePubKeyHash)
-import Contract.Config (ContractParams, testnetNamiConfig)
+import Cardano.Types.RedeemerDatum as RedeemerDatum
+import Cardano.Types.Transaction as Transaction
+import Contract.Address (mkAddress)
+import Contract.Config
+  ( ContractParams
+  , KnownWallet(Nami)
+  , WalletSpec(ConnectToGenericCip30)
+  , testnetConfig
+  , walletName
+  )
 import Contract.Log (logInfo, logInfo')
 import Contract.Monad
   ( Contract
@@ -18,14 +37,11 @@ import Contract.Monad
   , runContract
   )
 import Contract.PlutusData (PlutusData(Integer))
-import Contract.ScriptLookups as Lookups
 import Contract.Transaction
   ( ScriptRef(NativeScriptRef, PlutusScriptRef)
   , awaitTxConfirmed
-  , submitTxFromConstraints
+  , submitTxFromBuildPlan
   )
-import Contract.TxConstraints (DatumPresence(DatumInline, DatumWitness))
-import Contract.TxConstraints as Constraints
 import Contract.Value (Value)
 import Contract.Value (lovelaceValueOf, singleton) as Value
 import Contract.Wallet
@@ -37,14 +53,17 @@ import Ctl.Examples.Helpers (mkAssetName) as Helpers
 import Ctl.Examples.PlutusV2.OneShotMinting (oneShotMintingPolicyScriptV2)
 import Data.Array (head) as Array
 import Data.Log.Tag (tag)
-import Data.Map (toUnfoldable) as Map
+import Data.Map (empty, toUnfoldable) as Map
 import JS.BigInt (fromInt) as BigInt
 import Partial.Unsafe (unsafePartial)
 import Test.QuickCheck.Arbitrary (arbitrary)
 import Test.QuickCheck.Gen (randomSampleOne)
 
 main :: Effect Unit
-main = example testnetNamiConfig
+main = example $ testnetConfig
+  { walletSpec =
+      Just $ ConnectToGenericCip30 (walletName Nami) { cip95: false }
+  }
 
 example :: ContractParams -> Effect Unit
 example = launchAff_ <<< flip runContract contract
@@ -54,6 +73,9 @@ contract = do
   logInfo' "Running Examples.Utxos"
   pkh <- liftedM "Failed to get own PKH" ownPaymentPubKeyHash
   skh <- ownStakePubKeyHash
+  address <- mkAddress
+    (PaymentCredential $ PubKeyHashCredential $ unwrap pkh)
+    (StakeCredential <<< PubKeyHashCredential <<< unwrap <$> skh)
 
   datum <- liftEffect
     $ Integer
@@ -77,45 +99,33 @@ contract = do
     adaValue :: Value
     adaValue = Value.lovelaceValueOf (BigNum.fromInt 2_000_000)
 
-    mintValue :: Mint
-    mintValue = Mint.singleton cs0 tn0 (Int.fromInt one)
-
     tokenValue = Value.singleton cs0 tn0 BigNum.one
 
-    constraints :: Constraints.TxConstraints
-    constraints = mconcat
-      [ Constraints.mustMintValue mintValue
-      , mustPayWithDatumAndScriptRef pkh skh datum DatumWitness plutusScriptRef
-          (unsafePartial $ tokenValue <> adaValue)
-      , mustPayWithDatumAndScriptRef pkh skh datum DatumInline nativeScriptRef
-          adaValue
+    plan =
+      [ MintAsset
+          cs0
+          tn0
+          (Int.fromInt one)
+          ( PlutusScriptCredential (ScriptValue oneShotMintingPolicy)
+              RedeemerDatum.unit
+          )
+      , Pay $ TransactionOutput
+          { address
+          , amount: unsafePartial $ tokenValue <> adaValue
+          , datum: Just $ OutputDatumHash $ hashPlutusData datum
+          , scriptRef: Just plutusScriptRef
+          }
+      , Pay $ TransactionOutput
+          { address
+          , amount: adaValue
+          , datum: Just $ OutputDatum datum
+          , scriptRef: Just nativeScriptRef
+          }
       ]
 
-    lookups :: Lookups.ScriptLookups
-    lookups = Lookups.plutusMintingPolicy oneShotMintingPolicy <>
-      Lookups.unspentOutputs utxos
-
-  txHash <- submitTxFromConstraints lookups constraints
-  awaitTxConfirmed txHash
+  tx <- submitTxFromBuildPlan Map.empty mempty plan
+  awaitTxConfirmed $ Transaction.hash tx
   logInfo' "Tx submitted successfully!"
 
   utxos' <- liftedM "Failed to get UTxOs from wallet" getWalletUtxos
   logInfo (tag "utxos" $ show utxos') "Utxos after transaction confirmation:"
-
---------------------------------------------------------------------------------
--- Helpers
---------------------------------------------------------------------------------
-
-mustPayWithDatumAndScriptRef
-  :: forall (i :: Type) (o :: Type)
-   . PaymentPubKeyHash
-  -> Maybe StakePubKeyHash
-  -> PlutusData
-  -> DatumPresence
-  -> ScriptRef
-  -> Value
-  -> Constraints.TxConstraints
-mustPayWithDatumAndScriptRef pkh Nothing =
-  Constraints.mustPayToPubKeyWithDatumAndScriptRef pkh
-mustPayWithDatumAndScriptRef pkh (Just skh) =
-  Constraints.mustPayToPubKeyAddressWithDatumAndScriptRef pkh skh

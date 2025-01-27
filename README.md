@@ -88,7 +88,7 @@ CTL is being developed by MLabs. The following companies/funds have contributed 
 - [Indigo Protocol](https://indigoprotocol.io/)
 - [Equine](https://www.equine.gg/)
 - [Liqwid Labs](https://liqwid.finance/)
-- [PlayerMint](https://www.playermint.com/)
+- PlayerMint
 - [Fourier Labs](https://fourierlabs.io/)
 - Ardana
 
@@ -97,5 +97,5 @@ CTL is being developed by MLabs. The following companies/funds have contributed 
 - [Indigo Protocol](https://indigoprotocol.io/)
 - [Liqwid](https://liqwid.finance/)
 - [Clarity](https://clarity.community/)
-- [PlayerMint](https://www.playermint.com/)
+- PlayerMint
 - [SingularityNet](https://singularitynet.io/)

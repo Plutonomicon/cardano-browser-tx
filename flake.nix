@@ -9,6 +9,7 @@
 
   inputs = {
     nixpkgs.follows = "haskell-nix/nixpkgs-unstable";
+    nixpkgs-arion.url = "github:NixOS/nixpkgs";
     hackage-nix = {
       url = "github:input-output-hk/hackage.nix";
       flake = false;
@@ -32,13 +33,19 @@
       flake = false;
     };
 
-    cardano-node.url = "github:IntersectMBO/cardano-node/8.11.0-pre";
+    # The changes introduced in the PRs listed below have not yet been included
+    # in any cardano-node release. These updates are necessary to run
+    # cardano-testnet in the Conway era and be able to adjust max Lovelace
+    # supply.
+    # https://github.com/IntersectMBO/cardano-node/pull/5936
+    # https://github.com/IntersectMBO/cardano-node/pull/5960
+    cardano-node.url = "github:input-output-hk/cardano-node/d7abccd4e90c38ff5cd4d6a7839689d888332056";
 
     # Repository with network parameters
     # NOTE(bladyjoker): Cardano configurations (yaml/json) often change format and break, that's why we pin to a specific known version.
     cardano-configurations = {
       # Override with "path:/path/to/cardano-configurations";
-      url = "github:input-output-hk/cardano-configurations?rev=692010ed0f454bfbb566c06443227c79e2f4dbab";
+      url = "github:input-output-hk/cardano-configurations?rev=7969a73e5c7ee1f3b2a40274b34191fdd8de170b";
       flake = false;
     };
 
@@ -48,18 +55,9 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # TODO: Remove this input as soon as a new version compatible with
-    # the latest node is released. Use Kupo from cardano-nix.
-    kupo-nixos = {
-      url = "github:Fourierlabs/kupo-nixos/add-conway";
-      inputs = {
-        CHaP.follows = "CHaP";
-      };
-    };
-
     # Get Ogmios test fixtures
     ogmios = {
-      url = "github:CardanoSolutions/ogmios/v6.4.0";
+      url = "github:CardanoSolutions/ogmios/v6.5.0";
       flake = false;
     };
 
@@ -77,20 +75,18 @@
   outputs =
     { self
     , nixpkgs
+    , nixpkgs-arion
     , cardano-configurations
     , cardano-node
     , ...
     }@inputs:
     let
-      supportedSystems = [
-        "x86_64-linux"
-        "x86_64-darwin"
-        "aarch64-linux"
-        "aarch64-darwin"
-      ];
+      linuxSystems = [ "x86_64-linux" "aarch64-linux" ];
+      darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
+      supportedSystems = linuxSystems ++ darwinSystems;
 
-      ogmiosVersion = "6.4.0";
-      kupoVersion = "2.8.0";
+      ogmiosVersion = "6.5.0";
+      kupoVersion = "2.9.0";
 
       perSystem = nixpkgs.lib.genAttrs supportedSystems;
 
@@ -98,6 +94,7 @@
         overlays = nixpkgs.lib.attrValues self.overlays ++ [
           (_: _: {
             ogmios-fixtures = inputs.ogmios;
+            arion = (import nixpkgs-arion { inherit system; }).arion;
           })
         ];
         inherit system;
@@ -146,7 +143,7 @@
           cp -rT ogmios $out
         '';
 
-      psProjectFor = pkgs:
+      psProjectFor = pkgs: system:
         let
           projectName = "cardano-transaction-lib";
           # `filterSource` will still trigger rebuilds with flakes, even if a
@@ -167,21 +164,19 @@
             packageJson = ./package.json;
             packageLock = ./package-lock.json;
             shell = {
-              withRuntime = true;
+              withRuntime = system == "x86_64-linux";
               shellHook = exportOgmiosFixtures;
               packageLockOnly = true;
-              packages = with pkgs; [
-                arion
-                fd
-                psmisc
-                nixpkgs-fmt
-                nodePackages.eslint
-                nodePackages.prettier
-                blockfrost-backend-ryo
-                cardano-node.packages.${system}.cardano-testnet
-                cardano-node.packages.${system}.cardano-cli
-                cardano-node.packages.${system}.cardano-node
-              ];
+              packages = with pkgs;
+                (if (builtins.elem system linuxSystems) then [ psmisc procps ] else [ ]) ++
+                [
+                  arion
+                  fd
+                  nixpkgs-fmt
+                  nodePackages.eslint
+                  nodePackages.prettier
+                  blockfrost-backend-ryo
+                ];
             };
           };
           exportOgmiosFixtures =
@@ -216,8 +211,7 @@
               name = "ctl-e2e-test";
               runnerMain = "Test.Ctl.E2E";
               testMain = "Ctl.Examples.ByUrl";
-              buildInputs = [ inputs.kupo-nixos.packages.${pkgs.system}.kupo ];
-              # buildInputs = [ inputs.cardano-nix.packages.${pkgs.system}."kupo-${kupoVersion}" ];
+              buildInputs = [ inputs.cardano-nix.packages.${pkgs.system}."kupo-${kupoVersion}" ];
             };
             ctl-local-testnet-test = project.runLocalTestnetTest {
               name = "ctl-local-testnet-test";
@@ -235,6 +229,8 @@
           };
 
           devShell = project.devShell;
+
+          nodeModules = project.nodeModules;
 
           apps = {
             # TODO: restore this
@@ -292,8 +288,7 @@
                 cardano-testnet = cardano-node.packages.${system}.cardano-testnet;
                 cardano-node = cardano-node.packages.${system}.cardano-node;
                 cardano-cli = cardano-node.packages.${system}.cardano-cli;
-                kupo = inputs.kupo-nixos.packages.${system}.kupo;
-                # kupo = cardano-nix.packages.${system}."kupo-${kupoVersion}";
+                kupo = cardano-nix.packages.${system}."kupo-${kupoVersion}";
                 cardano-db-sync = inputs.db-sync.packages.${system}.cardano-db-sync;
                 blockfrost-backend-ryo = inputs.blockfrost.packages.${system}.blockfrost-backend-ryo;
                 buildCtlRuntime = buildCtlRuntime final;
@@ -306,18 +301,18 @@
       devShells = perSystem (system: {
         # This is the default `devShell` and can be run without specifying
         # it (i.e. `nix develop`)
-        default = (psProjectFor (nixpkgsFor system)).devShell;
+        default = (psProjectFor (nixpkgsFor system) system).devShell;
       });
 
       packages = perSystem (system:
-        (psProjectFor (nixpkgsFor system)).packages
+        (psProjectFor (nixpkgsFor system) system).packages
       );
 
       apps = perSystem (system:
         let
           pkgs = nixpkgsFor system;
         in
-        (psProjectFor pkgs).apps // {
+        (psProjectFor pkgs system).apps // {
           ctl-runtime = pkgs.launchCtlRuntime { };
           ctl-runtime-blockfrost = pkgs.launchCtlRuntime { blockfrost.enable = true; };
           default = self.apps.${system}.ctl-runtime;
@@ -335,9 +330,9 @@
       checks = perSystem (system:
         let
           pkgs = nixpkgsFor system;
-
+          psProject = psProjectFor pkgs system;
         in
-        (psProjectFor pkgs).checks
+        psProject.checks
         // {
           formatting-check = pkgs.runCommand "formatting-check"
             {
@@ -350,7 +345,10 @@
               ];
             }
             ''
-              cd ${self}
+              cd $TMPDIR
+              ln -sfn ${psProject.nodeModules}/lib/node_modules node_modules
+              cp -r ${self}/* .
+
               make check-format
               touch $out
             '';
@@ -364,9 +362,9 @@
             diff \
               <(jq -S .dependencies <<< $ctlPackageJson) \
               <(jq -S .dependencies <<< $ctlScaffoldPackageJson)
-            # We don't want to include `doctoc` in the template dev dependencies.
+            # We don't want to include some dev dependencies.
             diff \
-              <(jq -S '.devDependencies | del(.jssha) | del(.blakejs) | del(.doctoc)' <<< $ctlPackageJson) \
+              <(jq -S '.devDependencies | del(.jssha) | del(.blakejs) | del(.doctoc) | del(.globals) | del(.["@eslint/js"])' <<< $ctlPackageJson) \
               <(jq -S .devDependencies <<< $ctlScaffoldPackageJson)
             touch $out
           '';
@@ -485,14 +483,13 @@
         modules = [
           inputs.cardano-node.nixosModules.cardano-node
           inputs.cardano-nix.nixosModules.ogmios
-          inputs.kupo-nixos.nixosModules.kupo
-          # inputs.cardano-nix.nixosModules.kupo
+          inputs.cardano-nix.nixosModules.kupo
           ./nix/test-nixos-configuration.nix
         ];
         specialArgs = {
           inherit (inputs) cardano-configurations;
           ogmios = inputs.cardano-nix.packages.${system}."ogmios-${ogmiosVersion}";
-          # kupo = inputs.cardano-nix.packages.${system}."kupo-${kupoVersion}";
+          kupo = inputs.cardano-nix.packages.${system}."kupo-${kupoVersion}";
         };
       };
 
