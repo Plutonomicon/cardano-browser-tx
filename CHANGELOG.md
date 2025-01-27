@@ -101,6 +101,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Updating to CSL `v13.2.0` should resolve the issue of occasional transaction script integrity hash mismatches on tx submission ([#1656](https://github.com/Plutonomicon/cardano-transaction-lib/pull/1656))
 - Fixed a critical bug where Blockfrost `getUtxo` would also return **spent** outputs ([#1664](https://github.com/Plutonomicon/cardano-transaction-lib/pull/1664))
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed transaction witness set 'attach' functions. Previously, the updated witness set was incorrectly appended to the existing set, causing performance degradation when processing constraints for complex transactions. ([#1653](https://github.com/Plutonomicon/cardano-transaction-lib/pull/1653))
+- [CLB emulator](https://github.com/mlabs-haskell/clb) was added as a more lightweight testnet option
+- Betting example from Atlas (known as "bet-ref") was reimplemented in CTL to showcase CLB tests
+- FIXME: Some tests from the testnet suite are still red when being run against CLB:
+  * Get ChainTip
+  * wait for slot far in the future
+  * Getting transaction metadata
+  * Query for current time and era summaries
+  * acquireMempoolSnapshot
+  * fetchMempoolTXs
+  * mempoolSnapshotSizeAndCapacity
+
 ## [v9.3.1]
 
 ### Fixed

@@ -286,14 +286,16 @@ spawnCardanoTestnet :: FilePath -> TestnetClusterConfig -> Aff ManagedProcess
 spawnCardanoTestnet workdir params = do
   env <- liftEffect Node.Process.getEnv
   let
+    envP = Object.fromFoldable
+      [ "TMPDIR" /\ workdir
+      ]
     env' = Object.fromFoldable
       [ "CARDANO_CLI" /\ "cardano-cli"
       , "CARDANO_NODE" /\ "cardano-node"
-      , "TMPDIR" /\ workdir
       ]
     opts = defaultSpawnOptions
       { cwd = Just workdir
-      , env = Just $ Object.union env' env
+      , env = Just $ Object.union envP $ Object.union env env'
       , detached = true
       }
   spawn "cardano-testnet" options opts Nothing

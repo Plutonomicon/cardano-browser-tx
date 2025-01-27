@@ -25,27 +25,75 @@
 
 ## Overview
 
-[`cardano-testnet`](https://github.com/IntersectMBO/cardano-node/tree/master/cardano-testnet) is a tool for spinning up temporary local testnets. CTL integrates with it to provide an environment for `Contract` testing, that is very close to production.
+Traditionally, when testing dApps on Cardano, developers start with unit-testing separate on-chain scripts
+and then move to testing whole transactions. To do this a running ledger is needed.
+Currently, CTL provides two options which are discussed here in detail.
+
+The first option is a Cardano emulator [CLB](https://github.com/mlabs-haskell/clb) that can pretend 
+to be a standalone Cardano node without notions of consensus and network interactions. 
+It is fast, lightweight, and provides a basic ledger that can be accessed through an IPC socket.
+
+The second option is a private network, that runs a set of real-cardano nodes. 
+This is slower and consumes more resources, but represents a more realistic environment.
+
+In most cases, it makes sense to start using the emulator and switch to a private network
+as soon as tests necessitate features that are not supported by the emulator.
+
+Fortunately, CTL allows you to do that easily, since both approaches leverage 
+the same spinning-up mechanism, namely 
+[`cardano-testnet`](https://github.com/IntersectMBO/cardano-node/tree/master/cardano-testnet) 
+It is a  tool for spinning up temporary local testnets. 
+CTL integrates with it to provide an environment for `Contract` testing, that is very close to production.
+
+Further in this document we use the term "testnet" in a general sense 
+for both beforementioned options (if it is not stated explicitly). 
 
 ## Architecture
 
 CTL depends on a number of binaries in the `$PATH` to execute tests on the
 Cardano Testnet:
 
-- [`cardano-node`](https://github.com/IntersectMBO/cardano-node) to connect to the Cardano Testnet
-- [`ogmios`](https://ogmios.dev/)
-- [`kupo`](https://cardanosolutions.github.io/kupo/)
+- [`cardano-node`](https://github.com/IntersectMBO/cardano-node)
+to connect to the Cardano Testnet
+- [`cardano-node-socket-emulator`](https://github.com/mlabs-haskell/clb)
+as a replacement for `cardano-node` for emulator-based mode
+- [`cardano-testnet`](https://github.com/IntersectMBO/cardano-node/tree/master/cardano-testnet)
+to create configuration for a testnet and launch it
+- [`ogmios`](https://ogmios.dev/) to communicate with node/emulator
+- [`kupo`](https://cardanosolutions.github.io/kupo/) to index the chain
 
-All of these are provided by CTL's `overlays.runtime` (and are provided in
-CTL's own `devShell`). You **must** use the `runtime` overlay or otherwise make
-the services available in your package set (e.g. by defining them within your
-own `overlays` when instantiating `nixpkgs`) as `purescriptProject.runTest`
-expects all of them; an example of using CTL's overlays is in the
-[`ctl-scaffold` template](../templates/ctl-scaffold/flake.nix#L35).
+By default, a full-fledged testnet will be used.
+If you want to use the emulator instead, you can 
+export the `CARDANO_NODE` shell variable pointing to the emulator binary.
+To facilitate this the Nix shell exposes the binary in `SOCKET_EMULATOR` variable,
+the command to run a suite against the emulator is:
 
-The services are NOT run by `docker-compose` (via `arion`) as is the case with
-`launchCtlRuntime`: instead, they are started and stopped on each CTL
-`ContractTest` execution by CTL itself.
+```bash
+$ export CARDANO_NODE=$SOCKET_EMULATOR; npm run <test-suite>
+```
+Quite often, you need to get access to a temporary folder
+that contains testnet configuration along with logs and other files.
+You can preserve it by 
+exporting a variable TESTNET_CLEANUP_WORKDIR with value 0:
+
+```bash 
+$ export TESTNET_CLEANUP_WORKDIR=0
+```
+
+The name of the folder can be found in the tests' output.
+You have to set `suppressLogs` to `false` in your `Testnetconfig` to get it.
+
+All of these binaries are provided by CTL's `overlays.runtime` 
+(and are provided in CTL's own `devShell`). 
+You **must** use the `runtime` overlay 
+or make the services available somehow in your package set 
+(e.g. by defining them within your own `overlays` when instantiating `nixpkgs`)
+as `purescriptProject.runTest` expects all of them; 
+an example of using CTL's overlays is in the [`ctl-scaffold` template](../templates/ctl-scaffold/flake.nix#L35).
+
+The services are NOT run by `docker-compose` (via `arion`) 
+as is the case with `launchCtlRuntime`: 
+instead, they are started and stopped on each CTL `ContractTest` execution by CTL itself.
 
 If you have based your project on the [`ctl-scaffold`
 template](../templates/ctl-scaffold) then you have two options to run tests on
@@ -53,31 +101,33 @@ the Cardano Testnet:
 1. `nix develop` followed by `npm run test` (recommended for development)
 2. `nix run .#checks.x86_64-linux.ctl-scaffold-local-testnet-test`
    * where you'd usually replace `x86_64-linux` with the system you run tests on
-   * and `ctl-scaffold-local-testnet-test` with the name of the test derivation for your project;
+   * and `ctl-scaffold-local-testnet-test` with the name of the test derivation for your project
 
 ## Testing contracts
 
-CTL provides integrated testing environment for Mote (a test framework in PureScript). Alternatively, testing in the `Aff` context is also available, which makes it possible to integrate with any testing framework (or none at all).
+CTL provides an integrated testing environment for Mote (a test framework in PureScript).
+Alternatively, testing in the `Aff` context is also available, which makes it possible 
+to integrate with any testing framework (or none at all).
 
 ### Testing with Mote
 
 [Mote](https://github.com/garyb/purescript-mote) is a DSL for defining and
-grouping tests (plus other quality of life features, e.g. skipping marked
-tests).
+grouping tests (plus other quality-of-life features, e.g. skipping marked tests).
 
-First (and more widely used) approach is to first build a tree of tests (in
-CTL's case a tree of `ContractTest` types -- basically a function from some
+The first (and more widely used) approach is to first build a tree of tests (in
+CTL's case a tree of `ContractTest` types -- which is just a function from some
 distribution of funds to a `Contract a`) via Mote and then use the
-`Contract.Test.Testnet.testTestnetContracts` function to execute them. This
-allows setting up the Cardano Testnet only once per top-level groups and tests
-passed to the `testTestnetContracts` and then use it in many independent tests.
-The function will interpret a `MoteT` (effectful test tree) into `Aff`, which
-you can then actually run.
+`Contract.Test.Testnet.testTestnetContracts` function to execute them. 
+This allows setting up the environment only once and (re-)use it for many independent tests.
+The function will interpret a `MoteT` (effectful test tree) into `Aff`,
+which you can then actually run.
 
 The [`ctl-scaffold` template](../templates/ctl-scaffold) provides a simple
-`Mote`-based example.
+`Mote`-based example. Also, you can find a complete simple betting example 
+within CTL tests in `Test.Ctl.BetRef`. 
 
 `Contract.Test.Testnet.testTestnetContracts` type is defined as follows:
+
 ```purescript
 testTestnetContracts
   :: TestnetConfig
@@ -129,7 +179,7 @@ suite = testTestnetContracts config do
 
 #### Using Mote testing interface
 
-To define tests suites you can use `test`, group them with `group` and also
+To define test suites you can use `test`, group them with `group`, and also
 wrap tests or groups with `bracket` to execute custom actions before and
 after tests/groups that are inside the bracket. Note that in Mote you can
 define several tests and several groups in a single block, and bracket that
@@ -155,33 +205,27 @@ testTestnetContracts
 
 ```
 where
-* `test :: Type` is a type of tests themselves,
-  * in our case it's [`ContractTest`](../src/Internal/Test/ContractTest.purs),
-    which in a nutshell describes a function from some wallet UTxO distribution to
-    a `Contract r`
-  * wallet UTxO distribution is the one that you need to pattern-match on when
-    writing tests
-* `m :: Type -> Type` is a monad where effects during the construction of the
-  test suite can be performed,
-  * here we use `Aff` again
-* `a :: Type` is a result of the test suite, we use `Unit` here.
+* `test :: Type` is a type of the tests themselves, in our case, [`ContractTest`](../src/Internal/Test/ContractTest.purs)
+* `m :: Type -> Type` is a monad where effects during the construction of the test suite can be performed, here we use `Aff`
+* `a :: Type` is a result of the test suite, and we use `Unit` here.
 
-`testTestnetContracts` also combines ADA distribution requirements of individual tests in a single ADA distribution requirement. This allows to create multiple wallets and
-fund them in one step, during the Testnet setup. See the comments in the
-[`Ctl.Internal.Testnet.Server` module](../src/Internal/Testnet/Contract.purs) for
-more info.
+`testTestnetContracts` also combines ADA distribution requirements of individual tests 
+in a single ADA distribution requirement. 
+This allows creation of multiple wallets and funding of them in one step, during the testnet setup. 
+See the comments in the [`Ctl.Internal.Testnet.Server` module](../src/Internal/Testnet/Contract.purs) 
+for more info.
 
 ### Testing in Aff context
 
 If using Mote is not desired, it's possible to use the `Contract.Test.Testnet.runTestnetContract` function,
-which takes a single `Contract`, connects to the Testnet and executes the passed
+which takes a single `Contract`, connects to the Testnet, and executes the passed
 contract. This function runs in `Aff`; it will also throw an exception should
-contract fail for any reason. The testnet is terminated after `Contract` execution.
+a contract fail for any reason. The testnet is terminated after `Contract` execution.
 
 You can either call this function directly from your test's `main` or use any
-library for grouping and describing tests which support `Aff` effects in test bodies.
+library for grouping and describing tests that support `Aff` effects in test bodies.
 
-`Contract.Test.Testnet.runTestnetContract`'s type is defined as follows:
+The type of `runTestnetContract` is defined as follows:
 
 ```purescript
 runTestnetContract
@@ -193,7 +237,7 @@ runTestnetContract
   -> Aff a
 ```
 
-`distr` is a specification of how many wallets and with how much funds should be
+`distr` is a specification of how many wallets and how much funds should be
 created. It should either be a `Unit` (for no wallets), nested tuples containing
 `Array BigInt` or an `Array (Array BigInt)`, where each element of the inner array
 specifies an UTxO amount in Lovelaces (0.000001 Ada).
@@ -202,7 +246,7 @@ The `wallets` argument of the callback is either a `Unit`, a tuple of `KeyWallet
 (with the same nesting level as in `distr`, which is guaranteed by
 `UtxoDistribution`) or an `Array KeyWallet`.
 
-`wallets` should be pattern-matched on, and its components should be passed to
+`wallets` value should be pattern-matched on, and its components should be passed to
 `withKeyWallet`:
 
 An example `Contract` with two actors using nested tuples:
@@ -241,7 +285,7 @@ runTestnetContract config distribution \wallets -> do
             wallets
 ```
 
-In most cases at least two UTxOs per wallet are needed (one of which will be used
+In most cases, at least two UTxOs per wallet are needed (one of which will be used
 as collateral, so it should exceed `5_000_000` Lovelace).
 
 Internally `runTestnetContract` runs a contract in an `Aff.bracket`, which creates
@@ -404,7 +448,9 @@ enterprise addresses (see [this issue](https://github.com/mlabs-haskell/plutip/i
 ## See also
 
 - To actually write the test bodies, [assertions library](./test-utils.md) can be
-  useful [(usage example)](../examples/ContractTestUtils.purs).
+  useful [(usage example)](../examples/ContractTestUtils.purs)
 - Take a look at CTL's Testnet tests for the usage examples:
-  - the entry point with `main` that runs Testnet tests is [here](../test/Testnet.purs),
-  - folder with various test suites is [here](../test/Testnet/).
+  - the entry point with `main` that runs Testnet tests is [here](../test/Testnet.purs)
+  - folder with various test suites is [here](../test/Testnet/)
+- There is a complete betting [example](../test/BetRef.purs) with reacher checks
+

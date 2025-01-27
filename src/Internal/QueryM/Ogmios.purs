@@ -86,6 +86,7 @@ import Aeson
   , fromArray
   , fromString
   , getField
+  , getFieldOptional
   , isNull
   , stringifyAeson
   , (.:)
@@ -527,9 +528,12 @@ instance DecodeAeson OgmiosEraSummaries where
       -- Null, so we want to fail if the field is absent but make Null value
       -- acceptable in presence of the field (hence why "end" is wrapped in
       -- `Maybe`).
-      end' <- getField o "end"
-      end <-
-        if isNull end' then pure Nothing else Just <$> decodeEraSummaryTime end'
+      end'' <- getFieldOptional o "end"
+      end <- case end'' of
+        Nothing -> pure Nothing
+        Just end' ->
+          if isNull end' then pure Nothing
+          else Just <$> decodeEraSummaryTime end'
       parameters <- decodeEraSummaryParameters =<< getField o "parameters"
       pure $ wrap { start, end, parameters }
 
