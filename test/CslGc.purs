@@ -20,6 +20,7 @@ suite =
       testExternalMemLeak
         { numIterations: 15
         , refIteration: 5
+        , smoothingWindowSize: 3
         , maxError: 50
         , delay: 1200
         , numArrays: 20
@@ -29,6 +30,7 @@ suite =
 type CslGcTestConfig =
   { numIterations :: Int
   , refIteration :: Int
+  , smoothingWindowSize :: Int
   , maxError :: Int -- percent
   , delay :: Int -- msec
   , numArrays :: Int
