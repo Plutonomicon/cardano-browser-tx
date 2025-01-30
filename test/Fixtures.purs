@@ -194,8 +194,8 @@ tokenName2 = tokenNameFromString "54657374546f6b656e32"
 
 txOutputBinaryFixture1 :: String
 txOutputBinaryFixture1 =
-  "8258390030fb3b8539951e26f034910a5a37f22cb99d94d1d409f69ddbaea9711c12f03c1ef2\
-  \e935acc35ec2e6f96c650fd3bfba3e96550504d5336100"
+  "a20058390030fb3b8539951e26f034910a5a37f22cb99d94d1d409f69ddbaea9\
+  \711c12f03c1ef2e935acc35ec2e6f96c650fd3bfba3e96550504d533610100"
 
 pkhBech32 :: Bech32String
 pkhBech32 = "addr_vkh1zuctrdcq6ctd29242w8g84nlz0q38t2lnv3zzfcrfqktx0c9tzp"

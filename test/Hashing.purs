@@ -54,7 +54,7 @@ datumHashFixture :: DataHash
 datumHashFixture =
   unsafePartial $ fromJust $ decodeCbor $ wrap $
     hexToByteArrayUnsafe
-      "0ba47e574456db8938e56f889d4c30099256f96008e0d4b6c4688f47ec342c9d"
+      "5749c9c9879bbc8b4f546c3eb481ea8680a48768c6e9d84ce2c7d3ec855b998a"
 
 plutusV1ScriptFixture :: PlutusScript
 plutusV1ScriptFixture =
