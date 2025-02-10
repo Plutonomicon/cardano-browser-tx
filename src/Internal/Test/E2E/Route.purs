@@ -127,7 +127,6 @@ addLinks configMaps testMaps = do
 -- | ```
 -- | gero:MintsMultiple
 -- | eternl:AlwaysSucceeds:58200b07c066ba037344acee5431e6df41f6034bf1c5ffd6f803751e356807c6a209
--- | nami-mock:MintsMultiple:58200b07c066ba037344acee5431e6df41f6034bf1c5ffd6f803751e356807c6a209:5820f0db841df6c7fbc4506c58fad6676db0354a02dfd26efca445715a8adeabc338
 -- | ```
 -- |
 -- | In case that for the specified `E2EConfigName` a `WalletMock` is provided
@@ -191,7 +190,7 @@ route configs tests = do
   noConfigParametersError :: E2EConfigName -> String
   noConfigParametersError configName =
     "Unable to look up the config parameters: " <> configName
-      <> "Common reasons are:\n"
+      <> "\nCommon reasons are:\n"
       <> "- The page that is used to serve the test contracts is not up to "
       <> "date\n"
       <> "- The name of the test suite configuration is wrong ("

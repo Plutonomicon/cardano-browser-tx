@@ -65,7 +65,7 @@ For purposes of testing, there are two parts to using a wallet: providing the ri
 ### Where to Find the Installed Extensions
 
 1. Locate your browser profile directory. Commonly used locations include: `~/.config/{google-chrome,chromium}/Default` (where `Default` is the profile name), `~/snap/chromium/common/chromium/Default`.
-2. Make sure that inside the profile, your desired extension is unpacked. Nami should be in `Extensions/lpfcbjknijpeeillifnkikgncikgfhdo`, Gero (testnet version) in `Extensions/iifeegfcfhlhhnilhfoeihllenamcfgc`.
+2. Make sure that inside the profile, your desired extension is unpacked. Gero (testnet version) should be in `Extensions/iifeegfcfhlhhnilhfoeihllenamcfgc`.
 3. Add the version as a subdirectory, too. The final path may look like `/home/user/.config/google-chrome/Default/Extensions/iifeegfcfhlhhnilhfoeihllenamcfgc/1.10.9_0`
 
 ### How to Use a Different User Wallet
@@ -125,10 +125,6 @@ The tests can set up using CLI arguments, environment variables, or both. CLI ar
 | Lode CRX URL                                                           | `--lode-crx-url`            | `LODE_CRX_URL`             |
 | Lode password                                                          | `--lode-password`           | `LODE_PASSWORD`            |
 | Lode Extension ID                                                      | `--lode-extid`              | `LODE_EXTID`               |
-| Nami CRX URL                                                           | `--nami-crx-url`            | `NAMI_CRX_URL`             |
-| Nami CRX file                                                          | `--nami-crx`                | `NAMI_CRX`                 |
-| Nami password                                                          | `--nami-password`           | `NAMI_PASSWORD`            |
-| Nami Extension ID                                                      | `--nami-extid`              | `NAMI_EXTID`               |
 | Flint CRX URL                                                          | `--flint-crx-url`           | `FLINT_CRX_URL`            |
 | Flint CRX file                                                         | `--flint-crx`               | `FLINT_CRX`                |
 | Flint password                                                         | `--flint-password`          | `FLINT_PASSWORD`           |
@@ -231,12 +227,10 @@ main = do
 
 configs :: Map E2EConfigName (ContractParams /\ Maybe WalletMock)
 configs = Map.fromFoldable
-  [ "nami" /\ testnetNamiConfig /\ Nothing
-  , "gero" /\ testnetGeroConfig /\ Nothing
+  [ "gero" /\ testnetGeroConfig /\ Nothing
   , "flint" /\ testnetFlintConfig /\ Nothing
   , "eternl" /\ testnetEternlConfig /\ Nothing
   , "lode" /\ testnetLodeConfig /\ Nothing
-  , "nami-mock" /\ testnetNamiConfig /\ Just MockNami
   , "gero-mock" /\ testnetGeroConfig /\ Just MockGero
   , "flint-mock" /\ testnetFlintConfig /\ Just MockFlint
   , "lode-mock" /\ testnetLodeConfig /\ Just MockLode
@@ -300,15 +294,14 @@ It's possible to run headless browser tests on top of a Cardano Testnet cluster.
 To do that, it's enough to define a config name that:
 
 - uses a `ContractParams` value with `networkId` set to `MainnetId`.
-- Specifies a wallet mock (e.g. `MockNami`)
+- Specifies a wallet mock (e.g. `MockGero`)
 
 E.g.:
 
 ```purescript
 wallets :: Map E2EConfigName (ContractParams /\ Maybe WalletMock)
 wallets = Map.fromFoldable
-  [ "testnet-nami-mock" /\ mainnetNamiConfig /\ Just MockNami
-  , "testnet-gero-mock" /\ mainnetGeroConfig /\ Just MockGero
+  [ "testnet-gero-mock" /\ mainnetGeroConfig /\ Just MockGero
   , "testnet-flint-mock" /\ mainnetFlintConfig /\ Just MockFlint
   , "testnet-lode-mock" /\ mainnetLodeConfig /\ Just MockLode
   ]

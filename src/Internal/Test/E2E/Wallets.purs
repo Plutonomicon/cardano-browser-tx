@@ -8,8 +8,6 @@ module Ctl.Internal.Test.E2E.Wallets
   , flintSign
   , lodeConfirmAccess
   , lodeSign
-  , namiConfirmAccess
-  , namiSign
   , laceConfirmAccess
   , laceSign
   ) where
@@ -164,28 +162,6 @@ eternlSign extId password re = do
   where
   pattern :: Pattern
   pattern = wrap $ unExtensionId extId <> "/www/index.html#/signtx"
-
-namiConfirmAccess :: ExtensionId -> RunningE2ETest -> Aff Unit
-namiConfirmAccess extId re = do
-  wasInPage <- isJust <$> inWalletPageOptional extId pattern re
-    confirmAccessTimeout
-    (clickButton "Access")
-  when wasInPage do
-    waitForWalletPageClose pattern 10.0 re.browser
-  where
-  pattern :: Pattern
-  pattern = wrap $ unExtensionId extId
-
-namiSign :: ExtensionId -> WalletPassword -> RunningE2ETest -> Aff Unit
-namiSign extId wpassword re = do
-  inWalletPage (Pattern $ unExtensionId extId) re signTimeout \page -> do
-    void $ Toppokki.pageWaitForSelector (wrap ".chakra-button") {} page
-    clickButton "Sign" page
-    void $ Toppokki.pageWaitForSelector (wrap $ unwrap $ inputType "password")
-      {}
-      page
-    typeInto (inputType "password") wpassword page
-    clickButton "Confirm" page
 
 geroConfirmAccess :: ExtensionId -> RunningE2ETest -> Aff Unit
 geroConfirmAccess extId re = do
