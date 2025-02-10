@@ -55,7 +55,7 @@ import Ctl.Internal.Test.E2E.Types
   , SettingsArchive
   , SettingsRuntime
   , TmpDir
-  , WalletExt(FlintExt, NamiExt, GeroExt, LodeExt, EternlExt, LaceExt)
+  , WalletExt(FlintExt, GeroExt, LodeExt, EternlExt, LaceExt)
   , getE2EWalletExtension
   , mkE2ETest
   , mkExtensionId
@@ -72,8 +72,6 @@ import Ctl.Internal.Test.E2E.Wallets
   , laceSign
   , lodeConfirmAccess
   , lodeSign
-  , namiConfirmAccess
-  , namiSign
   )
 import Ctl.Internal.Test.UtxoDistribution (withStakeKey)
 import Ctl.Internal.Testnet.Contract (withTestnetContractEnv)
@@ -291,7 +289,6 @@ testPlan opts@{ tests } rt@{ wallets } =
                     FlintExt -> flintConfirmAccess
                     GeroExt -> geroConfirmAccess
                     LodeExt -> lodeConfirmAccess
-                    NamiExt -> namiConfirmAccess
                     LaceExt -> laceConfirmAccess
                 sign =
                   case wallet of
@@ -299,7 +296,6 @@ testPlan opts@{ tests } rt@{ wallets } =
                     FlintExt -> flintSign
                     GeroExt -> geroSign
                     LodeExt -> lodeSign
-                    NamiExt -> namiSign
                     LaceExt -> laceSign
                 someWallet =
                   { wallet
@@ -362,7 +358,6 @@ readTestRuntime testOptions = do
         ( delete (Proxy :: Proxy "noHeadless")
             <<< delete (Proxy :: Proxy "tests")
             <<< delete (Proxy :: Proxy "testTimeout")
-            <<< delete (Proxy :: Proxy "plutipPort")
             <<< delete (Proxy :: Proxy "ogmiosPort")
             <<< delete (Proxy :: Proxy "kupoPort")
             <<< delete (Proxy :: Proxy "passBrowserLogs")
@@ -371,15 +366,12 @@ readTestRuntime testOptions = do
 
 readPorts :: TestOptions -> Effect ClusterPortsOptions
 readPorts testOptions = do
-  plutipPort <-
-    readPortNumber "PLUTIP" testOptions.plutipPort
   ogmiosPort <-
     readPortNumber "OGMIOS" testOptions.ogmiosPort
   kupoPort <-
     readPortNumber "KUPO" testOptions.kupoPort
   pure
-    { plutipPort
-    , ogmiosPort
+    { ogmiosPort
     , kupoPort
     }
   where
@@ -400,7 +392,6 @@ readExtensions
   :: Map.Map WalletExt ExtensionOptions
   -> Aff (Map.Map WalletExt ExtensionParams)
 readExtensions wallets = do
-  nami <- readExtensionParams "NAMI" wallets
   flint <- readExtensionParams "FLINT" wallets
   gero <- readExtensionParams "GERO" wallets
   lode <- readExtensionParams "LODE" wallets
@@ -408,8 +399,7 @@ readExtensions wallets = do
   lace <- readExtensionParams "LACE" wallets
 
   pure $ Map.fromFoldable $ catMaybes
-    [ Tuple NamiExt <$> nami
-    , Tuple FlintExt <$> flint
+    [ Tuple FlintExt <$> flint
     , Tuple GeroExt <$> gero
     , Tuple LodeExt <$> lode
     , Tuple EternlExt <$> eternl
@@ -535,19 +525,19 @@ readTests optUrls = do
   mkError testSpec =
     error $ "Failed to parse test data from: " <> testSpec <>
       "\nTest spec must be of form \"wallet:url\", where allowed wallets are: \
-      \eternl, flint, gero, lode, nami."
+      \eternl, flint, gero, lode."
 
 -- | Run an example in a new browser page.
 -- |
 -- | Example usage:
 -- |
 -- | ```purescript
--- |   withBrowser options NamiExt \browser -> do
+-- |   withBrowser options EternlExt \browser -> do
 -- |     withE2ETest
 -- |        false -- do not skip jQuery
 -- |        (wrap "http://myserver:1234/docontract")
 -- |        browser do
--- |          namiSign $ wrap "mypassword"
+-- |          eternlSign $ wrap "mypassword"
 -- | ```
 withE2ETest
   :: forall (a :: Type)
@@ -718,7 +708,7 @@ readExtensionParams extName wallets = do
     liftMaybe (error $ mkExtIdError str) $ mkExtensionId str
   let
     mbCliOptions :: Maybe ExtensionOptions
-    mbCliOptions = Map.lookup NamiExt wallets
+    mbCliOptions = Map.lookup EternlExt wallets
 
     envOptions :: ExtensionOptions
     envOptions = { crxFile, password, extensionId, crxUrl }
@@ -951,5 +941,4 @@ walletName = case _ of
   FlintExt -> "flint"
   GeroExt -> "gero"
   LodeExt -> "lode"
-  NamiExt -> "nami"
   LaceExt -> "lace"

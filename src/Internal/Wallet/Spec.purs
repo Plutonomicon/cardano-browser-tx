@@ -1,6 +1,6 @@
 module Ctl.Internal.Wallet.Spec
   ( Cip1852DerivationPath
-  , KnownWallet(Nami, Gero, Flint, Eternl, Lode, Lace, NuFi)
+  , KnownWallet(Gero, Flint, Eternl, Lode, Lace, NuFi)
   , MnemonicSource(MnemonicString, MnemonicFile)
   , PrivateDrepKeySource(PrivateDrepKeyValue)
   , PrivateStakeKeySource(PrivateStakeKeyFile, PrivateStakeKeyValue)
@@ -105,11 +105,10 @@ derive instance Generic WalletSpec _
 instance Show WalletSpec where
   show = genericShow
 
-data KnownWallet = Nami | Gero | Flint | Eternl | Lode | Lace | NuFi
+data KnownWallet = Gero | Flint | Eternl | Lode | Lace | NuFi
 
 walletName :: KnownWallet -> String
 walletName = case _ of
-  Nami -> "nami"
   Gero -> "gerowallet"
   Flint -> "flint"
   Eternl -> "eternl"
