@@ -183,7 +183,7 @@ import Control.Monad.Reader.Trans (ReaderT, runReaderT)
 import Control.Parallel (parTraverse)
 import Ctl.Internal.Affjax (request) as Affjax
 import Ctl.Internal.Contract.ProviderBackend (BlockfrostBackend)
-import Ctl.Internal.QueryM.Ogmios (AdditionalUtxoSet)
+import Ctl.Internal.QueryM.Ogmios.Types (AdditionalUtxoSet)
 import Ctl.Internal.ServerConfig (ServerConfig, mkHttpUrl)
 import Ctl.Internal.Service.Helpers
   ( aesonArray

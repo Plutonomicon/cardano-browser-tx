@@ -2,6 +2,7 @@ module Ctl.Internal.Service.Helpers
   ( aesonArray
   , aesonString
   , aesonObject
+  , aesonNull
   , decodeAssetClass
   ) where
 
@@ -11,6 +12,7 @@ import Aeson
   ( Aeson
   , JsonDecodeError(TypeMismatch)
   , caseAesonArray
+  , caseAesonNull
   , caseAesonObject
   , caseAesonString
   )
@@ -45,6 +47,12 @@ aesonString
   -> Aeson
   -> Either JsonDecodeError a
 aesonString = caseAesonString (Left (TypeMismatch "String"))
+
+aesonNull
+  :: forall (a :: Type)
+   . Aeson
+  -> Either JsonDecodeError Unit
+aesonNull = caseAesonNull (Left (TypeMismatch "Null")) pure
 
 decodeAssetClass
   :: String

@@ -16,7 +16,7 @@ import Cardano.Types.EraSummaries
   , SafeZone(SafeZone)
   , SlotLength(SlotLength)
   )
-import Ctl.Internal.QueryM.Ogmios
+import Ctl.Internal.QueryM.Ogmios.Types
   ( OgmiosEraSummaries(OgmiosEraSummaries)
   , OgmiosSystemStart
   )

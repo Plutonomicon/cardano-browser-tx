@@ -7,22 +7,19 @@ import Prelude
 
 import Aeson (Aeson, JsonDecodeError, encodeAeson, printJsonDecodeError)
 import Aeson as Aeson
-import Contract.Backend.Ogmios.Mempool (MempoolSizeAndCapacity)
 import Control.Monad.Error.Class (liftEither)
 import Control.Monad.Trans.Class (lift)
 import Control.Parallel (parTraverse)
-import Ctl.Internal.QueryM.JsonRpc2
+import Ctl.Internal.QueryM.Ogmios.Mempool (HasTxR, MempoolSizeAndCapacity) as Mempool
+import Ctl.Internal.QueryM.Ogmios.Types
   ( class DecodeOgmios
   , OgmiosDecodeError(ErrorResponse)
-  , decodeOgmios
-  )
-import Ctl.Internal.QueryM.Ogmios
-  ( HasTxR
   , OgmiosTxEvaluationR
   , SubmitTxR
-  , aesonObject
+  , decodeOgmios
   )
-import Ctl.Internal.QueryM.Ogmios as O
+import Ctl.Internal.QueryM.Ogmios.Types as O
+import Ctl.Internal.Service.Helpers (aesonObject)
 import Data.Array (catMaybes, groupAllBy, nubBy)
 import Data.Array.NonEmpty (NonEmptyArray, head, length, tail)
 import Data.Bifunctor (lmap)
@@ -66,8 +63,8 @@ tested =
     )
   , ("evaluateTransaction" /\ check (Proxy :: _ OgmiosTxEvaluationR))
   , ("submitTransaction" /\ check (Proxy :: _ SubmitTxR))
-  , ("hasTransaction" /\ check (Proxy :: _ HasTxR))
-  , ("sizeOfMempool" /\ check (Proxy :: _ MempoolSizeAndCapacity))
+  , ("hasTransaction" /\ check (Proxy :: _ Mempool.HasTxR))
+  , ("sizeOfMempool" /\ check (Proxy :: _ Mempool.MempoolSizeAndCapacity))
   -- ignoring because response may lack tx cbor if not run with flag
   -- This endpoint is tested with "fetchMempoolTXs" test (Test.Ctl.Plutip.Contract.OgmiosMempool)
   -- , ("nextTransaction" /\ (Proxy :: _ MaybeMempoolTransaction ))

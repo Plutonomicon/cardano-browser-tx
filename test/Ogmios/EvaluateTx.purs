@@ -2,7 +2,8 @@ module Test.Ctl.Ogmios.EvaluateTx (suite) where
 
 import Prelude
 
-import Aeson (JsonDecodeError(TypeMismatch))
+import Aeson (stringifyAeson)
+import Cardano.Provider.Error (ClientError(ClientDecodeJsonError))
 import Cardano.Provider.TxEvaluation
   ( ExecutionUnits
   , RedeemerPointer
@@ -13,11 +14,11 @@ import Cardano.Provider.TxEvaluation
 import Cardano.Types (BigNum)
 import Cardano.Types.BigNum as BigNum
 import Cardano.Types.RedeemerTag (RedeemerTag(Spend, Cert, Reward))
-import Ctl.Internal.QueryM.JsonRpc2
-  ( OgmiosDecodeError(ResultDecodingError)
+import Ctl.Internal.QueryM.Ogmios.Types
+  ( OgmiosDecodeError(ClientErrorResponse)
+  , OgmiosTxEvaluationR
   , decodeOgmios
   )
-import Ctl.Internal.QueryM.Ogmios (OgmiosTxEvaluationR)
 import Data.Either (Either(Left, Right))
 import Data.Map as Map
 import Data.Maybe (fromJust)
@@ -52,12 +53,19 @@ suite = do
           _ -> false
 
       test "Fails to decode a response with invalid redeemer pointer format" do
-        txEvalR :: Either OgmiosDecodeError TxEvaluationR <-
-          (map (\(r :: OgmiosTxEvaluationR) -> unwrap r) <<< decodeOgmios) <$>
-            liftEffect
-              ogmiosEvaluateTxInvalidPointerFormatFixture
+        body <- liftEffect ogmiosEvaluateTxInvalidPointerFormatFixture
+        let
+          (txEvalR :: Either OgmiosDecodeError TxEvaluationR) =
+            (map (\(r :: OgmiosTxEvaluationR) -> unwrap r) <<< decodeOgmios)
+              body
         txEvalR `shouldSatisfy` case _ of
-          Left (ResultDecodingError (TypeMismatch _)) -> true
+          Left
+            ( ClientErrorResponse
+                ( ClientDecodeJsonError
+                    bodyStr
+                    _
+                )
+            ) -> bodyStr == stringifyAeson body
           _ -> false
 
       test "Successfully decodes a failed execution response (Incompatible era)"

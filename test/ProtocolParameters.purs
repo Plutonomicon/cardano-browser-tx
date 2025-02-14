@@ -8,7 +8,7 @@ import Prelude
 import Aeson (class DecodeAeson, decodeJsonString)
 import Contract.Test.Mote (TestPlanM, interpretWithConfig)
 import Control.Monad.Error.Class (liftEither)
-import Ctl.Internal.QueryM.Ogmios
+import Ctl.Internal.QueryM.Ogmios.Types
   ( OgmiosProtocolParameters(OgmiosProtocolParameters)
   )
 import Ctl.Internal.Service.Blockfrost

@@ -104,7 +104,7 @@ import Ctl.Internal.Helpers
   , showWithParens
   , unsafeFromJust
   )
-import Ctl.Internal.QueryM.Ogmios (aesonObject)
+import Ctl.Internal.Service.Helpers (aesonObject)
 import Ctl.Internal.Types.SystemStart (SystemStart, sysStartUnixTime)
 import Data.Argonaut.Encode.Encoders (encodeString)
 import Data.Array (find, head, index, length)

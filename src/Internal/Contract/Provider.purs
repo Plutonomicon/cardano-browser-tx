@@ -16,9 +16,8 @@ import Ctl.Internal.Contract.LogParams (LogParams)
 import Ctl.Internal.Contract.ProviderBackend (BlockfrostBackend, CtlBackend)
 import Ctl.Internal.Helpers (logWithLevel)
 import Ctl.Internal.QueryM (QueryM)
-import Ctl.Internal.QueryM (evaluateTxOgmios, getChainTip, submitTxOgmios) as QueryM
-import Ctl.Internal.QueryM.CurrentEpoch (getCurrentEpoch) as QueryM
-import Ctl.Internal.QueryM.EraSummaries (getEraSummaries) as QueryM
+import Ctl.Internal.QueryM.CurrentEpoch (getCurrentEpoch) as Ogmios
+import Ctl.Internal.QueryM.EraSummaries (getEraSummaries) as Ogmios
 import Ctl.Internal.QueryM.Kupo
   ( getDatumByHash
   , getOutputAddressesByTxHash
@@ -28,12 +27,17 @@ import Ctl.Internal.QueryM.Kupo
   , isTxConfirmed
   , utxosAt
   ) as Kupo
-import Ctl.Internal.QueryM.Ogmios (SubmitTxR(SubmitFail, SubmitTxSuccess))
+import Ctl.Internal.QueryM.Ogmios
+  ( evaluateTxOgmios
+  , getChainTip
+  , submitTxOgmios
+  ) as Ogmios
+import Ctl.Internal.QueryM.Ogmios.Types (SubmitTxR(SubmitFail, SubmitTxSuccess))
 import Ctl.Internal.QueryM.Pools
   ( getPoolIds
   , getPubKeyHashDelegationsAndRewards
   , getValidatorHashDelegationsAndRewards
-  ) as QueryM
+  ) as Ogmios
 import Ctl.Internal.Service.Blockfrost
   ( BlockfrostServiceM
   , runBlockfrostServiceM
@@ -59,13 +63,13 @@ providerForCtlBackend runQueryM params backend =
   , doesTxExist: runQueryM' <<< map (map isJust) <<< Kupo.isTxConfirmed
   , getTxAuxiliaryData: runQueryM' <<< Kupo.getTxAuxiliaryData
   , utxosAt: runQueryM' <<< Kupo.utxosAt
-  , getChainTip: Right <$> runQueryM' QueryM.getChainTip
-  , getCurrentEpoch: unwrap <$> runQueryM' QueryM.getCurrentEpoch
+  , getChainTip: Right <$> runQueryM' Ogmios.getChainTip
+  , getCurrentEpoch: unwrap <$> runQueryM' Ogmios.getCurrentEpoch
   , submitTx: \tx -> runQueryM' do
       let txHash = Transaction.hash tx
       logDebug' $ "Pre-calculated tx hash: " <> show txHash
       let txCborBytes = encodeCbor tx
-      result <- QueryM.submitTxOgmios txHash txCborBytes
+      result <- Ogmios.submitTxOgmios txHash txCborBytes
       pure $ case result of
         SubmitTxSuccess th -> do
           if th == txHash then Right th
@@ -74,17 +78,18 @@ providerForCtlBackend runQueryM params backend =
                 "Computed TransactionHash is not equal to the one returned by Ogmios, please report as bug!"
             )
         SubmitFail err -> Left $ ClientOtherError $ show err
-  , evaluateTx: \tx additionalUtxos -> unwrap <$> runQueryM' do
-      let txBytes = encodeCbor tx
-      QueryM.evaluateTxOgmios txBytes (wrap additionalUtxos)
-  , getEraSummaries: Right <$> runQueryM' QueryM.getEraSummaries
-  , getPoolIds: Right <$> runQueryM' QueryM.getPoolIds
+  , evaluateTx: \tx additionalUtxos ->
+      runQueryM' do
+        let txBytes = encodeCbor tx
+        Ogmios.evaluateTxOgmios txBytes (wrap additionalUtxos)
+  , getEraSummaries: Right <$> runQueryM' Ogmios.getEraSummaries
+  , getPoolIds: Right <$> runQueryM' Ogmios.getPoolIds
   , getPubKeyHashDelegationsAndRewards: \_ pubKeyHash ->
       Right <$> runQueryM'
-        (QueryM.getPubKeyHashDelegationsAndRewards pubKeyHash)
+        (Ogmios.getPubKeyHashDelegationsAndRewards pubKeyHash)
   , getValidatorHashDelegationsAndRewards: \_ validatorHash ->
       Right <$> runQueryM'
-        (QueryM.getValidatorHashDelegationsAndRewards $ wrap validatorHash)
+        (Ogmios.getValidatorHashDelegationsAndRewards $ wrap validatorHash)
   }
 
   where
